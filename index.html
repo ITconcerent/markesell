@@ -2966,7 +2966,7 @@
                     <div class="specs">${product.specs || ''}</div>
                     <div class="price">${product.price.toLocaleString('uk-UA')} ₴</div>
                     <div class="product-actions">
-                        <button class="details-btn" onclick="event.stopPropagation(); openProductDetails(${product.id}, '${category}')">
+                        <button class="details-btn" onclick="handleDetailsButton(${product.id}, '${category}', event)">
                             <i class="fas fa-info-circle"></i>
                             Детальніше
                         </button>
@@ -2977,12 +2977,29 @@
                     </div>
                 `;
                 
-                productCard.addEventListener('click', function() {
-                    openProductDetails(product.id, category);
+                // Додаємо обробник кліку на всю картку товару
+                productCard.addEventListener('click', function(e) {
+                    // Перевіряємо, що клік не на кнопках
+                    if (!e.target.closest('.wishlist-heart') && 
+                        !e.target.closest('.details-btn') && 
+                        !e.target.closest('.buy-btn')) {
+                        openProductDetails(product.id, category);
+                    }
                 });
                 
                 productGrid.appendChild(productCard);
             });
+        }
+
+        // ========== ФУНКЦІЇ ДЛЯ ПЕРЕХОДУ НА СТОРІНКУ ТОВАРУ ==========
+        function openProductDetails(productId, category) {
+            // Перехід на сторінку товару з передачею параметрів
+            window.location.href = `product.html?id=${productId}&category=${category}`;
+        }
+
+        function handleDetailsButton(productId, category, event) {
+            if (event) event.stopPropagation();
+            openProductDetails(productId, category);
         }
 
         // Функція для отримання товару за ID
@@ -3317,7 +3334,7 @@
                     <div class="specs">${product.specs || ''}</div>
                     <div class="price">${product.price.toLocaleString('uk-UA')} ₴</div>
                     <div class="product-actions">
-                        <button class="details-btn" onclick="event.stopPropagation(); openProductDetails(${product.id}, '${product.category}')">
+                        <button class="details-btn" onclick="handleDetailsButton(${product.id}, '${product.category}', event)">
                             <i class="fas fa-info-circle"></i>
                             Детальніше
                         </button>
@@ -3328,8 +3345,12 @@
                     </div>
                 `;
                 
-                productCard.addEventListener('click', function() {
-                    openProductDetails(product.id, product.category);
+                productCard.addEventListener('click', function(e) {
+                    if (!e.target.closest('.wishlist-heart') && 
+                        !e.target.closest('.details-btn') && 
+                        !e.target.closest('.buy-btn')) {
+                        openProductDetails(product.id, product.category);
+                    }
                 });
                 
                 wishlistGrid.appendChild(productCard);
@@ -3603,18 +3624,6 @@
 
         function openCart() {
             showNotification('🛒 Функціонал кошика в розробці', 'info');
-        }
-
-        function openProductDetails(productId, category) {
-            const card = event.target.closest('.product-card');
-            if (card) {
-                card.style.transform = 'scale(0.95)';
-                setTimeout(() => {
-                    card.style.transform = '';
-                }, 150);
-            }
-            
-            showNotification('📱 Перехід на сторінку товару в розробці', 'info');
         }
 
         function searchProducts() {
