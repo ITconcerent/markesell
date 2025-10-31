@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="cart.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Підключення Supabase -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -766,7 +768,6 @@
 
             .footer-content {
                 grid-template-columns: repeat(2, 1fr);
-                gap: 30px;
             }
 
             .modal-content {
@@ -833,437 +834,6 @@
 
         .profile-content {
             animation: fadeIn 0.6s ease-out;
-        }
-
-        /* ========== АДАПТАЦІЯ ДЛЯ МОБІЛЬНИХ ПРИСТРОЇВ (320px-480px) ========== */
-        @media (max-width: 480px) {
-            /* Загальні стилі */
-            body {
-                font-size: 14px;
-            }
-            
-            /* Контейнер профілю */
-            .profile-container {
-                margin: 10px auto;
-                padding: 0 10px;
-                width: 100%;
-            }
-            
-            /* Кнопка назад */
-            .back-btn {
-                width: 100%;
-                padding: 12px 16px;
-                font-size: 14px;
-                margin-bottom: 15px;
-                justify-content: center;
-            }
-            
-            /* Контент профілю */
-            .profile-content {
-                padding: 15px;
-                border-radius: 10px;
-                margin: 0 auto;
-            }
-            
-            /* Шапка профілю */
-            .profile-header {
-                flex-direction: column;
-                text-align: center;
-                gap: 15px;
-                margin-bottom: 25px;
-                padding-bottom: 15px;
-            }
-            
-            .profile-avatar {
-                width: 60px;
-                height: 60px;
-                font-size: 24px;
-                margin: 0 auto;
-            }
-            
-            .profile-info h1 {
-                font-size: 20px;
-                margin-bottom: 5px;
-            }
-            
-            .profile-info p {
-                font-size: 14px;
-                margin-bottom: 8px;
-            }
-            
-            .admin-badge {
-                font-size: 11px;
-                padding: 4px 10px;
-            }
-            
-            /* Сітка профілю */
-            .profile-grid {
-                grid-template-columns: 1fr;
-                gap: 15px;
-                margin-bottom: 25px;
-            }
-            
-            .profile-section {
-                padding: 15px;
-                border-radius: 8px;
-            }
-            
-            .profile-section h3 {
-                font-size: 16px;
-                margin-bottom: 12px;
-                justify-content: center;
-                flex-wrap: wrap;
-            }
-            
-            /* Статистика */
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 8px;
-            }
-            
-            .stat-item {
-                padding: 10px 5px;
-            }
-            
-            .stat-number {
-                font-size: 18px;
-            }
-            
-            .stat-label {
-                font-size: 11px;
-            }
-            
-            /* Замовлення та активність */
-            .orders-list {
-                max-height: 150px;
-            }
-            
-            .order-item {
-                padding: 10px;
-                flex-direction: column;
-                gap: 5px;
-                text-align: center;
-            }
-            
-            .order-info h4 {
-                font-size: 13px;
-                margin-bottom: 3px;
-            }
-            
-            .order-date {
-                font-size: 11px;
-            }
-            
-            .order-status {
-                font-size: 10px;
-                padding: 4px 8px;
-            }
-            
-            .empty-orders {
-                padding: 15px 10px;
-            }
-            
-            .empty-orders i {
-                font-size: 32px;
-                margin-bottom: 8px;
-            }
-            
-            .empty-orders h4 {
-                font-size: 14px;
-            }
-            
-            .empty-orders p {
-                font-size: 12px;
-            }
-            
-            /* Особиста інформація */
-            .personal-info {
-                font-size: 13px;
-            }
-            
-            .personal-info p {
-                margin-bottom: 8px;
-                display: flex;
-                flex-direction: column;
-                gap: 2px;
-                text-align: center;
-            }
-            
-            .personal-info strong {
-                font-size: 12px;
-                color: #333;
-            }
-            
-            /* Кнопки дій */
-            .profile-actions {
-                flex-direction: column;
-                gap: 10px;
-            }
-            
-            .profile-btn {
-                width: 100%;
-                padding: 12px 16px;
-                font-size: 14px;
-                justify-content: center;
-            }
-            
-            /* Модальне вікно */
-            .modal-content {
-                width: 95%;
-                margin: 10px;
-                max-width: none;
-            }
-            
-            .modal-header {
-                padding: 15px 20px 10px;
-            }
-            
-            .modal-header h2 {
-                font-size: 18px;
-            }
-            
-            .modal-body {
-                padding: 15px 20px;
-            }
-            
-            .modal-footer {
-                padding: 15px 20px;
-                flex-direction: column;
-                gap: 8px;
-            }
-            
-            .btn {
-                width: 100%;
-                padding: 12px;
-                font-size: 14px;
-            }
-            
-            /* Форми */
-            .form-group {
-                margin-bottom: 15px;
-            }
-            
-            .form-control {
-                padding: 10px;
-                font-size: 16px;
-            }
-            
-            /* Футер */
-            .modern-footer {
-                padding: 30px 0 15px 0;
-            }
-            
-            .footer-content {
-                grid-template-columns: 1fr;
-                gap: 25px;
-                padding: 0 15px;
-            }
-            
-            .footer-column h3 {
-                font-size: 16px;
-                margin-bottom: 15px;
-                justify-content: center;
-            }
-            
-            .footer-links {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 8px;
-            }
-            
-            .footer-links li {
-                margin-bottom: 6px;
-            }
-            
-            .footer-links a {
-                font-size: 12px;
-                padding: 6px 0;
-                justify-content: flex-start;
-            }
-            
-            .footer-links a i {
-                font-size: 12px;
-                width: 14px;
-            }
-            
-            .contact-info {
-                gap: 10px;
-            }
-            
-            .contact-item {
-                font-size: 12px;
-                justify-content: center;
-            }
-            
-            .footer-social {
-                justify-content: center;
-                margin-top: 15px;
-                gap: 10px;
-            }
-            
-            .footer-social-link {
-                width: 35px;
-                height: 35px;
-                font-size: 14px;
-            }
-            
-            .footer-bottom {
-                padding: 20px 15px 0 15px;
-                margin-top: 25px;
-            }
-            
-            .footer-bottom p {
-                font-size: 11px;
-                flex-direction: column;
-                gap: 5px;
-                text-align: center;
-            }
-            
-            /* Гамбургер меню */
-            .hamburger-menu {
-                top: 8px;
-                left: 8px;
-            }
-            
-            .hamburger-btn {
-                width: 35px;
-                height: 35px;
-            }
-            
-            .hamburger-line {
-                width: 18px;
-                height: 2px;
-            }
-            
-            .mobile-menu {
-                width: 100%;
-                padding: 60px 0 20px 0;
-            }
-            
-            .menu-header {
-                padding: 0 20px 15px 20px;
-            }
-            
-            .menu-header .logo {
-                font-size: 20px;
-                text-align: center;
-            }
-            
-            .menu-item a {
-                padding: 12px 15px;
-                font-size: 14px;
-            }
-            
-            .social-links {
-                padding: 15px;
-                gap: 10px;
-            }
-            
-            .social-link {
-                width: 35px;
-                height: 35px;
-                font-size: 14px;
-            }
-
-            /* Шапка сайту */
-            .header-top {
-                padding: 10px 15px;
-                flex-direction: column;
-                gap: 10px;
-                text-align: center;
-            }
-
-            .header-top .logo {
-                font-size: 20px;
-            }
-
-            .user-actions {
-                flex-direction: column;
-                gap: 8px;
-            }
-
-            .user-actions a {
-                font-size: 14px;
-                padding: 8px 12px;
-            }
-        }
-
-        /* Додаткові корективи для дуже малих екранів */
-        @media (max-width: 360px) {
-            .profile-container {
-                padding: 0 5px;
-            }
-            
-            .profile-content {
-                padding: 12px;
-            }
-            
-            .profile-section {
-                padding: 12px;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-                gap: 6px;
-            }
-            
-            .footer-links {
-                grid-template-columns: 1fr;
-            }
-            
-            .order-item {
-                padding: 8px;
-            }
-            
-            .profile-btn {
-                padding: 10px 14px;
-                font-size: 13px;
-            }
-
-            .footer-links {
-                grid-template-columns: 1fr;
-            }
-
-            .modal-content {
-                margin: 5px;
-            }
-        }
-
-        /* Стилі для шапки (якщо є в HTML) */
-        .header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 20px;
-            background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .header-top .logo {
-            font-size: 24px;
-            font-weight: bold;
-            color: #000;
-        }
-
-        .header-top .logo span {
-            color: #007aff;
-        }
-
-        .user-actions {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
-        .user-actions a {
-            color: #007aff;
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.3s;
-        }
-
-        .user-actions a:hover {
-            color: #0056cc;
         }
     </style>
 </head>
@@ -1640,42 +1210,38 @@
         </div>
     </footer>
 
-    <!-- Підключаємо JavaScript -->
-    <script src="cart.js"></script>
+    <!-- ОНОВЛЕНИЙ JavaScript з перевіркою авторизації -->
     <script>
+        // ========== ІНІЦІАЛІЗАЦІЯ SUPABASE ==========
+        const supabaseUrl = 'https://mkyeotrxjswptzytnpgi.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1reWVvdHJ4anN3cHR6eXRucGdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4NDY0NzEsImV4cCI6MjA3NzQyMjQ3MX0.WGj4n2CdAVmLaX77fP-yoLgesS3P1zC9wj3YqM73QXY';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // ========== ПЕРЕВІРКА АВТОРИЗАЦІЇ ==========
+        async function checkAuth() {
+            const { data: { session } } = await supabase.auth.getSession();
+            return session;
+        }
+
         // ========== СИСТЕМА ПРОФІЛЮ ==========
-        
         let currentUser = null;
-        let usersDatabase = JSON.parse(localStorage.getItem('storeUsers')) || [];
 
         // Функція завантаження профілю
-        function loadUserProfile() {
-            // Отримуємо поточного користувача з localStorage
-            currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        async function loadUserProfile() {
+            const session = await checkAuth();
             
-            if (!currentUser) {
+            if (!session) {
                 // Якщо користувач не авторизований, перенаправляємо на головну
                 window.location.href = 'index.html';
                 return;
             }
 
-            // Оновлюємо дані користувача з бази даних (для синхронізації)
-            syncUserData();
-            
+            // Отримуємо дані користувача
+            const { data: { user } } = await supabase.auth.getUser();
+            currentUser = user;
+
             // Відображаємо дані профілю
             displayProfileData();
-        }
-
-        // Синхронізація даних користувача
-        function syncUserData() {
-            const storedUsers = JSON.parse(localStorage.getItem('storeUsers')) || [];
-            const updatedUser = storedUsers.find(user => user.id === currentUser.id);
-            
-            if (updatedUser) {
-                // Оновлюємо дані поточного користувача
-                currentUser = { ...currentUser, ...updatedUser };
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            }
         }
 
         // Відображення даних профілю
@@ -1683,316 +1249,158 @@
             if (!currentUser) return;
 
             // Основна інформація
-            document.getElementById('profile-name').textContent = currentUser.name;
+            const name = currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'Користувач';
+            document.getElementById('profile-name').textContent = name;
             document.getElementById('profile-email').textContent = currentUser.email;
-            document.getElementById('profile-avatar').textContent = currentUser.name.charAt(0).toUpperCase();
-            document.getElementById('user-id').textContent = currentUser.id;
+            document.getElementById('profile-avatar').textContent = name.charAt(0).toUpperCase();
+            document.getElementById('user-id').textContent = currentUser.id.substring(0, 8);
             
-            // Статус адміна
-            const adminBadge = document.getElementById('admin-badge');
-            const adminPanelBtn = document.getElementById('admin-panel-btn');
-            const userStatus = document.getElementById('user-status');
-            
-            if (currentUser.isAdmin) {
-                adminBadge.style.display = 'inline-block';
-                adminPanelBtn.style.display = 'block';
-                userStatus.textContent = 'Адміністратор';
-            } else {
-                adminBadge.style.display = 'none';
-                adminPanelBtn.style.display = 'none';
-                userStatus.textContent = 'Користувач';
-            }
-
             // Дата реєстрації
-            const regDate = new Date(currentUser.createdAt);
+            const regDate = new Date(currentUser.created_at);
             document.getElementById('registration-date').textContent = regDate.toLocaleDateString('uk-UA');
 
-            // Телефон
-            document.getElementById('user-phone').textContent = currentUser.phone || 'Не вказано';
+            // Днів з нами
+            const today = new Date();
+            const daysWithUs = Math.floor((today - regDate) / (1000 * 60 * 60 * 24));
+            document.getElementById('member-since').textContent = daysWithUs;
 
-            // Статистика
+            // Оновлюємо статистику
             updateStatistics();
             
-            // Замовлення
+            // Відображаємо замовлення та активність
             displayOrders();
-            
-            // Активність
             displayActivity();
         }
 
         // Оновлення статистики
         function updateStatistics() {
-            const orders = currentUser.orders || [];
+            // Тут можна додати логіку для отримання статистики з бази даних
+            // Поки використовуємо демо-дані
+            document.getElementById('orders-count').textContent = '0';
+            
             const wishlist = JSON.parse(localStorage.getItem('wishlist')) || [];
-            const userWishlist = wishlist.filter(item => {
-                // Фільтруємо обране поточного користувача
-                const itemUser = item.userId || 'default';
-                const currentUserId = currentUser.id || 'default';
-                return itemUser === currentUserId;
-            });
-
-            // Кількість замовлень
-            document.getElementById('orders-count').textContent = orders.length;
-
-            // Кількість в обраному
-            document.getElementById('wishlist-count').textContent = userWishlist.length;
-
-            // Загальна сума витрат
-            const totalSpent = orders.reduce((total, order) => total + (order.total || 0), 0);
-            document.getElementById('total-spent').textContent = totalSpent.toLocaleString('uk-UA') + ' ₴';
-
-            // Днів з нами
-            const regDate = new Date(currentUser.createdAt);
-            const today = new Date();
-            const daysWithUs = Math.floor((today - regDate) / (1000 * 60 * 60 * 24));
-            document.getElementById('member-since').textContent = daysWithUs;
+            document.getElementById('wishlist-count').textContent = wishlist.length;
+            
+            document.getElementById('total-spent').textContent = '0 ₴';
         }
 
         // Відображення замовлень
         function displayOrders() {
             const ordersList = document.getElementById('orders-list');
-            const orders = currentUser.orders || [];
-
-            if (orders.length === 0) {
-                ordersList.innerHTML = `
-                    <div class="empty-orders">
-                        <i class="fas fa-shopping-bag"></i>
-                        <h4>Замовлень ще немає</h4>
-                        <p>Зробіть своє перше замовлення!</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // Сортуємо замовлення за датою (новіші перші)
-            const sortedOrders = orders.sort((a, b) => new Date(b.date) - new Date(a.date));
             
-            // Беремо останні 5 замовлень
-            const recentOrders = sortedOrders.slice(0, 5);
-
-            ordersList.innerHTML = recentOrders.map(order => `
-                <div class="order-item">
-                    <div class="order-info">
-                        <h4>Замовлення #${order.id}</h4>
-                        <div class="order-date">${new Date(order.date).toLocaleDateString('uk-UA')}</div>
-                    </div>
-                    <div class="order-status ${order.status === 'completed' ? 'status-completed' : 'status-pending'}">
-                        ${order.status === 'completed' ? 'Виконано' : 'В обробці'}
-                    </div>
+            // Поки що відображаємо пустий список
+            ordersList.innerHTML = `
+                <div class="empty-orders">
+                    <i class="fas fa-shopping-bag"></i>
+                    <h4>Замовлень ще немає</h4>
+                    <p>Зробіть своє перше замовлення!</p>
                 </div>
-            `).join('');
+            `;
         }
 
         // Відображення активності
         function displayActivity() {
             const activityList = document.getElementById('activity-list');
-            const activities = currentUser.activity || [];
-
-            if (activities.length === 0) {
-                activityList.innerHTML = `
-                    <div class="empty-orders">
-                        <i class="fas fa-history"></i>
-                        <h4>Активності поки немає</h4>
-                        <p>Ваша активність буде відображатися тут</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // Сортуємо активність за датою (новіші перші)
-            const sortedActivities = activities.sort((a, b) => new Date(b.date) - new Date(a.date));
             
-            // Беремо останні 5 активностей
-            const recentActivities = sortedActivities.slice(0, 5);
-
-            activityList.innerHTML = recentActivities.map(activity => `
-                <div class="order-item">
-                    <div class="order-info">
-                        <h4>${activity.action}</h4>
-                        <div class="order-date">${new Date(activity.date).toLocaleDateString('uk-UA')}</div>
-                    </div>
+            // Поки що відображаємо пустий список
+            activityList.innerHTML = `
+                <div class="empty-orders">
+                    <i class="fas fa-history"></i>
+                    <h4>Активності поки немає</h4>
+                    <p>Ваша активність буде відображатися тут</p>
                 </div>
-            `).join('');
+            `;
         }
 
-        // ========== СИСТЕМА РЕДАГУВАННЯ ПРОФІЛЮ ==========
+        // Функція виходу з акаунту
+        async function logout() {
+            await supabase.auth.signOut();
+            window.location.href = 'index.html';
+        }
 
-        // Відкриття модального вікна редагування профілю
+        // ========== РЕДАГУВАННЯ ПРОФІЛЮ ==========
         function openEditProfileModal() {
             if (!currentUser) return;
-
-            // Заповнюємо форму поточними даними
-            document.getElementById('edit-name').value = currentUser.name;
-            document.getElementById('edit-email').value = currentUser.email;
-            document.getElementById('edit-phone').value = currentUser.phone || '';
-
-            // Скидаємо помилки
-            document.getElementById('phone-error').classList.remove('show');
-            document.getElementById('edit-phone').classList.remove('error');
-
-            // Показуємо модальне вікно
+            
+            const name = currentUser.user_metadata?.full_name || '';
+            const email = currentUser.email || '';
+            
+            document.getElementById('edit-name').value = name;
+            document.getElementById('edit-email').value = email;
+            
             document.getElementById('edit-profile-modal').classList.add('active');
         }
 
-        // Закриття модального вікна редагування профілю
         function closeEditProfileModal() {
             document.getElementById('edit-profile-modal').classList.remove('active');
         }
 
-        // Валідація номера телефону
-        function validatePhoneNumber(phone) {
-            // Регулярний вираз для українських номерів у форматі +380 XX XXX XX XX
-            const phoneRegex = /^\+380\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}$/;
-            return phoneRegex.test(phone);
-        }
-
-        // Форматування номера телефону
-        function formatPhoneNumber(phone) {
-            // Видаляємо всі нецифрові символи
-            let cleaned = phone.replace(/\D/g, '');
-            
-            // Перевіряємо, чи номер починається з 380
-            if (cleaned.startsWith('380') && cleaned.length === 12) {
-                return `+${cleaned}`;
-            }
-            
-            // Якщо номер починається з 0 і має 10 цифр
-            if (cleaned.startsWith('0') && cleaned.length === 10) {
-                return `+38${cleaned}`;
-            }
-            
-            // Якщо номер має 9 цифр (без 0)
-            if (cleaned.length === 9) {
-                return `+380${cleaned}`;
-            }
-            
-            return phone;
-        }
-
-        // Збереження змін профілю
-        function saveProfileChanges() {
+        async function saveProfileChanges() {
             const name = document.getElementById('edit-name').value.trim();
             const email = document.getElementById('edit-email').value.trim();
-            let phone = document.getElementById('edit-phone').value.trim();
 
-            // Валідація обов'язкових полів
             if (!name || !email) {
                 showNotification('❌ Будь ласка, заповніть обов\'язкові поля', 'error');
                 return;
             }
 
-            // Валідація email
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                showNotification('❌ Будь ласка, введіть коректну електронну пошту', 'error');
-                return;
-            }
+            try {
+                const { error } = await supabase.auth.updateUser({
+                    email: email,
+                    data: { full_name: name }
+                });
 
-            // Валідація та форматування телефону
-            let phoneError = false;
-            if (phone) {
-                phone = formatPhoneNumber(phone);
-                if (!validatePhoneNumber(phone)) {
-                    document.getElementById('phone-error').classList.add('show');
-                    document.getElementById('edit-phone').classList.add('error');
-                    phoneError = true;
-                } else {
-                    document.getElementById('phone-error').classList.remove('show');
-                    document.getElementById('edit-phone').classList.remove('error');
+                if (error) {
+                    showNotification('❌ ' + error.message, 'error');
+                    return;
                 }
+
+                // Оновлюємо локальні дані
+                currentUser.user_metadata.full_name = name;
+                currentUser.email = email;
+
+                // Оновлюємо відображення профілю
+                displayProfileData();
+
+                // Закриваємо модальне вікно
+                closeEditProfileModal();
+
+                showNotification('✅ Профіль успішно оновлено!', 'success');
+
+            } catch (error) {
+                showNotification('❌ Помилка оновлення профілю', 'error');
             }
-
-            if (phoneError) {
-                showNotification('❌ Будь ласка, введіть коректний номер телефону у форматі +380 XX XXX XX XX', 'error');
-                return;
-            }
-
-            // Оновлюємо дані користувача
-            currentUser.name = name;
-            currentUser.email = email;
-            currentUser.phone = phone || null;
-
-            // Оновлюємо в базі даних
-            const usersDatabase = JSON.parse(localStorage.getItem('storeUsers')) || [];
-            const userIndex = usersDatabase.findIndex(user => user.id === currentUser.id);
-            
-            if (userIndex !== -1) {
-                usersDatabase[userIndex] = currentUser;
-                localStorage.setItem('storeUsers', JSON.stringify(usersDatabase));
-            }
-
-            // Оновлюємо поточного користувача
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-
-            // Оновлюємо відображення профілю
-            displayProfileData();
-
-            // Закриваємо модальне вікно
-            closeEditProfileModal();
-
-            // Показуємо сповіщення про успіх
-            showNotification('✅ Профіль успішно оновлено!', 'success');
         }
 
         // ========== ІНШІ ФУНКЦІЇ ==========
-
-        // Функція для відкриття адмін-панелі
-        function openAdminPanel() {
-            if (currentUser && currentUser.isAdmin) {
-                // Перевіряємо, чи не знаходимось ми вже в адмін панелі
-                if (!window.location.href.includes('admin-products.html')) {
-                    window.location.href = 'admin-products.html';
-                }
-            } else {
-                showNotification('❌ У вас немає прав доступу до адмін-панелі', 'error');
-            }
-        }
-
-        // Функція виходу з акаунту
-        function logout() {
-            localStorage.removeItem('currentUser');
-            window.location.href = 'index.html';
-        }
-
-        // Функція переходу назад
         function goBack() {
             window.location.href = 'index.html';
         }
 
-        // ========== СИСТЕМА МЕНЮ ==========
-        
-        const hamburgerBtn = document.getElementById('hamburger-btn');
-        const mobileMenu = document.getElementById('mobile-menu');
-        const menuOverlay = document.getElementById('menu-overlay');
+        function openCart() {
+            showNotification('🛒 Функціонал кошика в розробці', 'info');
+        }
 
-        // Відкриття/закриття меню
+        // ========== СИСТЕМА МЕНЮ ==========
         function toggleMenu() {
+            const hamburgerBtn = document.getElementById('hamburger-btn');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const menuOverlay = document.getElementById('menu-overlay');
+            
             hamburgerBtn.classList.toggle('active');
             mobileMenu.classList.toggle('active');
             menuOverlay.classList.toggle('active');
         }
 
-        // Закриття меню
         function closeMenu() {
+            const hamburgerBtn = document.getElementById('hamburger-btn');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const menuOverlay = document.getElementById('menu-overlay');
+            
             hamburgerBtn.classList.remove('active');
             mobileMenu.classList.remove('active');
             menuOverlay.classList.remove('active');
         }
-
-        // Додаємо обробники подій
-        hamburgerBtn.addEventListener('click', toggleMenu);
-        menuOverlay.addEventListener('click', closeMenu);
-
-        // Обробники для кнопок профілю
-        document.getElementById('logout-btn').addEventListener('click', logout);
-        document.getElementById('edit-profile-btn').addEventListener('click', openEditProfileModal);
-        document.getElementById('admin-panel-btn').addEventListener('click', openAdminPanel);
-
-        // Завантажуємо профіль при завантаженні сторінки
-        document.addEventListener('DOMContentLoaded', function() {
-            loadUserProfile();
-            updateCartCount();
-        });
 
         // Функція для сповіщень
         function showNotification(message, type = 'info') {
@@ -2023,26 +1431,34 @@
             }, 3000);
         }
 
-        // Функція оновлення лічильника кошика
-        function updateCartCount() {
-            const cart = JSON.parse(localStorage.getItem('cart')) || [];
-            const cartCount = document.querySelector('.cart-count');
-            if (cartCount) {
-                cartCount.textContent = cart.length;
-            }
-        }
+        // ========== ІНІЦІАЛІЗАЦІЯ ==========
+        document.addEventListener('DOMContentLoaded', function() {
+            // Завантажуємо профіль
+            loadUserProfile();
 
-        // Функція відкриття кошика
-        function openCart() {
-            alert('Функціонал кошика буде реалізовано в майбутньому');
-        }
+            // Ініціалізація меню
+            const hamburgerBtn = document.getElementById('hamburger-btn');
+            const menuOverlay = document.getElementById('menu-overlay');
+            const menuLinks = document.querySelectorAll('.mobile-menu a');
+            
+            hamburgerBtn.addEventListener('click', toggleMenu);
+            menuOverlay.addEventListener('click', closeMenu);
+            
+            menuLinks.forEach(link => {
+                link.addEventListener('click', closeMenu);
+            });
 
-        // Обробка натискання ESC для закриття модального вікна
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeEditProfileModal();
-                closeMenu();
-            }
+            // Обробники подій
+            document.getElementById('logout-btn').addEventListener('click', logout);
+            document.getElementById('edit-profile-btn').addEventListener('click', openEditProfileModal);
+
+            // Обробка ESC
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeEditProfileModal();
+                    closeMenu();
+                }
+            });
         });
     </script>
 </body>
