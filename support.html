@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="uk">
 <head>
@@ -6,6 +7,8 @@
     <title>Допомога / Підтримка - iMarket Sell</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Підключення Supabase -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -169,16 +172,14 @@
             font-size: 20px;
         }
 
-        .agent-info {
-            h4 {
-                color: #333;
-                margin-bottom: 5px;
-            }
+        .agent-info h4 {
+            color: #333;
+            margin-bottom: 5px;
+        }
 
-            p {
-                color: #666;
-                font-size: 14px;
-            }
+        .agent-info p {
+            color: #666;
+            font-size: 14px;
         }
 
         .chat-status {
@@ -1004,36 +1005,74 @@
     </footer>
 
     <script>
-        // ========== СИСТЕМА ЧАТУ ПІДТРИМКИ ==========
+        // ========== ІНІЦІАЛІЗАЦІЯ SUPABASE ==========
+        const supabaseUrl = 'https://mkyeotrxjswptzytnpgi.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1reWVvdHJ4anN3cHR6eXRucGdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4NDY0NzEsImV4cCI6MjA3NzQyMjQ3MX0.WGj4n2CdAVmLaX77fP-yoLgesS3P1zC9wj3YqM73QXY';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // ========== СИСТЕМА ЧАТУ ПІДТРИМКИ З SUPABASE ==========
         let currentUser = null;
         let chatInterval = null;
         let conversationActive = false;
+        let currentConversationId = null;
 
         // Ініціалізація користувача
-        function initializeUser() {
-            // Перевіряємо, чи є вже користувач
-            const storedUser = localStorage.getItem('currentSupportUser');
-            if (storedUser) {
-                currentUser = JSON.parse(storedUser);
-            } else {
-                // Створюємо нового користувача
-                currentUser = {
-                    id: 'user_' + Date.now(),
-                    name: 'Користувач',
-                    type: 'user',
-                    createdAt: new Date().toISOString()
-                };
-                localStorage.setItem('currentSupportUser', JSON.stringify(currentUser));
+        async function initializeUser() {
+            try {
+                // Перевіряємо, чи є вже користувач в localStorage
+                const storedUser = localStorage.getItem('currentSupportUser');
+                if (storedUser) {
+                    currentUser = JSON.parse(storedUser);
+                } else {
+                    // Створюємо нового користувача
+                    currentUser = {
+                        id: 'user_' + Date.now(),
+                        name: 'Користувач',
+                        type: 'user',
+                        createdAt: new Date().toISOString()
+                    };
+                    localStorage.setItem('currentSupportUser', JSON.stringify(currentUser));
+                }
+
+                // Завантажуємо активну розмову з Supabase
+                await loadActiveConversation();
+                
+                // Ініціалізуємо чат
+                initializeChat();
+                
+            } catch (error) {
+                console.error('Помилка ініціалізації користувача:', error);
+                showNotification('Помилка завантаження чату', 'error');
             }
-            
-            // Завантажуємо стан розмови
-            const savedConversationState = localStorage.getItem('conversationState_' + currentUser.id);
-            if (savedConversationState) {
-                conversationActive = JSON.parse(savedConversationState);
+        }
+
+        // Завантажити активну розмову з Supabase
+        async function loadActiveConversation() {
+            try {
+                const { data, error } = await supabase
+                    .from('support_conversations')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .eq('is_active', true)
+                    .single();
+
+                if (error && error.code !== 'PGRST116') {
+                    throw error;
+                }
+
+                if (data) {
+                    currentConversationId = data.id;
+                    conversationActive = true;
+                } else {
+                    conversationActive = false;
+                    currentConversationId = null;
+                }
+                
+            } catch (error) {
+                console.error('Помилка завантаження розмови:', error);
+                conversationActive = false;
+                currentConversationId = null;
             }
-            
-            // Ініціалізуємо чат
-            initializeChat();
         }
 
         // Ініціалізація чату
@@ -1058,110 +1097,150 @@
             }
             
             // Кнопка очищення завжди активна, якщо є повідомлення
-            const userMessages = getUserMessages();
-            clearBtn.disabled = userMessages.length === 0;
-        }
-
-        // Зберегти стан розмови
-        function saveConversationState() {
-            localStorage.setItem('conversationState_' + currentUser.id, JSON.stringify(conversationActive));
+            clearBtn.disabled = !conversationActive;
         }
 
         // Почати нову розмову
-        function startNewConversation() {
-            conversationActive = true;
-            saveConversationState();
-            updateButtonStates();
-            
-            // Додаємо привітальні повідомлення тільки якщо чат порожній
-            const userMessages = getUserMessages();
-            if (userMessages.length === 0) {
-                addSystemMessage('Вітаємо в службі підтримки iMarket Sell! Чим можемо вам допомогти?');
-                addSystemMessage('Наші фахівці завжди готові відповісти на ваші запитання щодо товарів, замовлень чи технічної підтримки.');
+        async function startNewConversation() {
+            try {
+                // Створюємо нову розмову в Supabase
+                const { data, error } = await supabase
+                    .from('support_conversations')
+                    .insert([{
+                        user_id: currentUser.id,
+                        user_name: currentUser.name,
+                        is_active: true,
+                        created_at: new Date().toISOString()
+                    }])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                currentConversationId = data.id;
+                conversationActive = true;
+                
+                // Додаємо привітальні повідомлення
+                await addSystemMessage('Вітаємо в службі підтримки iMarket Sell! Чим можемо вам допомогти?');
+                await addSystemMessage('Наші фахівці завжди готові відповісти на ваші запитання щодо товарів, замовлень чи технічної підтримки.');
+                
+                updateButtonStates();
+                showNotification('Розмова розпочата', 'success');
+                
+            } catch (error) {
+                console.error('Помилка створення розмови:', error);
+                showNotification('Помилка створення розмови', 'error');
             }
-            
-            showNotification('Розмова розпочата', 'success');
         }
 
         // Позначити проблему вирішеною
-        function markProblemSolved() {
-            conversationActive = false;
-            saveConversationState();
-            updateButtonStates();
-            
-            addSystemMessage('Дякуємо, що звернулися до нашої служби підтримки! Якщо у вас виникнуть додаткові питання, не соромтеся звертатися знову.');
-            
-            showNotification('Проблему позначено вирішеною', 'success');
-        }
+        async function markProblemSolved() {
+            try {
+                if (!currentConversationId) return;
 
-        // Очистити історію чату
-        function clearChatHistory() {
-            if (confirm('Ви впевнені, що хочете очистити історію чату? Цю дію не можна скасувати.')) {
-                // Отримуємо всі повідомлення
-                const allMessages = getAllMessages();
-                
-                // Створюємо новий масив повідомлень без повідомлень поточного користувача
-                const updatedMessages = allMessages.filter(msg => msg.userId !== currentUser.id);
-                
-                // Зберігаємо оновлений список повідомлень
-                localStorage.setItem('supportMessages', JSON.stringify(updatedMessages));
-                
-                // Очищаємо відображення чату
-                document.getElementById('chat-messages').innerHTML = '';
-                
-                // Оновлюємо стан кнопок
+                // Оновлюємо статус розмови в Supabase
+                const { error } = await supabase
+                    .from('support_conversations')
+                    .update({ 
+                        is_active: false,
+                        resolved_at: new Date().toISOString()
+                    })
+                    .eq('id', currentConversationId);
+
+                if (error) throw error;
+
+                // Додаємо фінальне повідомлення
+                await addSystemMessage('Дякуємо, що звернулися до нашої служби підтримки! Якщо у вас виникнуть додаткові питання, не соромтеся звертатися знову.');
+
+                conversationActive = false;
+                currentConversationId = null;
                 updateButtonStates();
                 
-                showNotification('Історія чату очищена', 'info');
+                showNotification('Проблему позначено вирішеною', 'success');
+                
+            } catch (error) {
+                console.error('Помилка закриття розмови:', error);
+                showNotification('Помилка закриття розмови', 'error');
             }
         }
 
-        // Отримати всі повідомлення
-        function getAllMessages() {
-            return JSON.parse(localStorage.getItem('supportMessages')) || [];
-        }
+        // Очистити історію чату
+        async function clearChatHistory() {
+            try {
+                if (!currentConversationId) return;
 
-        // Отримати повідомлення для поточного користувача
-        function getUserMessages() {
-            const allMessages = getAllMessages();
-            return allMessages.filter(msg => msg.userId === currentUser.id);
-        }
+                if (confirm('Ви впевнені, що хочете очистити історію чату? Цю дію не можна скасувати.')) {
+                    // Видаляємо всі повідомлення цієї розмови
+                    const { error } = await supabase
+                        .from('support_messages')
+                        .delete()
+                        .eq('conversation_id', currentConversationId);
 
-        // Зберегти повідомлення
-        function saveMessage(message) {
-            const allMessages = getAllMessages();
-            allMessages.push(message);
-            localStorage.setItem('supportMessages', JSON.stringify(allMessages));
-            
-            // Синхронізуємо з адміном
-            broadcastMessageUpdate();
+                    if (error) throw error;
+
+                    // Очищаємо відображення чату
+                    document.getElementById('chat-messages').innerHTML = '';
+                    
+                    showNotification('Історія чату очищена', 'info');
+                }
+                
+            } catch (error) {
+                console.error('Помилка очищення чату:', error);
+                showNotification('Помилка очищення чату', 'error');
+            }
         }
 
         // Завантажити повідомлення чату
-        function loadChatMessages() {
-            const chatMessages = document.getElementById('chat-messages');
-            const userMessages = getUserMessages();
-            
-            chatMessages.innerHTML = '';
-            
-            userMessages.forEach(msg => {
-                addMessageToChat(msg.text, msg.type, msg.timestamp, false);
-            });
-            
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+        async function loadChatMessages() {
+            try {
+                if (!currentConversationId) {
+                    document.getElementById('chat-messages').innerHTML = '';
+                    return;
+                }
+
+                const { data: messages, error } = await supabase
+                    .from('support_messages')
+                    .select('*')
+                    .eq('conversation_id', currentConversationId)
+                    .order('created_at', { ascending: true });
+
+                if (error) throw error;
+
+                const chatMessages = document.getElementById('chat-messages');
+                chatMessages.innerHTML = '';
+                
+                messages.forEach(msg => {
+                    addMessageToChat(msg.message_text, msg.sender_type, msg.created_at, false);
+                });
+                
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+            } catch (error) {
+                console.error('Помилка завантаження повідомлень:', error);
+            }
         }
 
         // Додати системне повідомлення
-        function addSystemMessage(text) {
-            const message = {
-                id: 'msg_' + Date.now(),
-                userId: currentUser.id,
-                text: text,
-                type: 'agent',
-                timestamp: new Date().toISOString()
-            };
-            saveMessage(message);
-            addMessageToChat(text, 'agent', message.timestamp, true);
+        async function addSystemMessage(text) {
+            try {
+                if (!currentConversationId) return;
+
+                const { error } = await supabase
+                    .from('support_messages')
+                    .insert([{
+                        conversation_id: currentConversationId,
+                        message_text: text,
+                        sender_type: 'agent',
+                        created_at: new Date().toISOString()
+                    }]);
+
+                if (error) throw error;
+
+                addMessageToChat(text, 'agent', new Date().toISOString(), true);
+                
+            } catch (error) {
+                console.error('Помилка додавання системного повідомлення:', error);
+            }
         }
 
         // Додати повідомлення в чат
@@ -1188,69 +1267,57 @@
         }
 
         // Відправити повідомлення
-        function sendMessage() {
-            // Перевіряємо, чи активна розмова
-            if (!conversationActive) {
-                showNotification('Будь ласка, почніть розмову, натиснувши кнопку "Почати розмову"', 'error');
-                return;
-            }
-            
-            const messageInput = document.getElementById('message-input');
-            const messageText = messageInput.value.trim();
-            
-            if (messageText === '') {
-                showNotification('Будь ласка, введіть повідомлення', 'error');
-                return;
-            }
-            
-            // Створюємо повідомлення
-            const message = {
-                id: 'msg_' + Date.now(),
-                userId: currentUser.id,
-                text: messageText,
-                type: 'user',
-                timestamp: new Date().toISOString()
-            };
-            
-            // Зберігаємо та відображаємо
-            saveMessage(message);
-            addMessageToChat(messageText, 'user', message.timestamp, true);
-            
-            // Очищаємо поле введення
-            messageInput.value = '';
-            messageInput.style.height = 'auto';
-            
-            // Показуємо сповіщення про відправку
-            showNotification('Повідомлення відправлено', 'success');
-        }
+        async function sendMessage() {
+            try {
+                // Перевіряємо, чи активна розмова
+                if (!conversationActive || !currentConversationId) {
+                    showNotification('Будь ласка, почніть розмову, натиснувши кнопку "Почати розмову"', 'error');
+                    return;
+                }
+                
+                const messageInput = document.getElementById('message-input');
+                const messageText = messageInput.value.trim();
+                
+                if (messageText === '') {
+                    showNotification('Будь ласка, введіть повідомлення', 'error');
+                    return;
+                }
+                
+                // Зберігаємо повідомлення в Supabase
+                const { error } = await supabase
+                    .from('support_messages')
+                    .insert([{
+                        conversation_id: currentConversationId,
+                        message_text: messageText,
+                        sender_type: 'user',
+                        created_at: new Date().toISOString()
+                    }]);
 
-        // Синхронізація з адміном
-        function broadcastMessageUpdate() {
-            // Використовуємо Broadcast Channel для сповіщення адміна
-            if (typeof BroadcastChannel !== 'undefined') {
-                const channel = new BroadcastChannel('support_messages');
-                channel.postMessage({
-                    type: 'messages_updated',
-                    timestamp: Date.now()
-                });
+                if (error) throw error;
+
+                // Відображаємо повідомлення
+                addMessageToChat(messageText, 'user', new Date().toISOString(), true);
+                
+                // Очищаємо поле введення
+                messageInput.value = '';
+                messageInput.style.height = 'auto';
+                
+                showNotification('Повідомлення відправлено', 'success');
+                
+            } catch (error) {
+                console.error('Помилка відправки повідомлення:', error);
+                showNotification('Помилка відправки повідомлення', 'error');
             }
-            
-            // Також зберігаємо в localStorage для перехресної синхронізації
-            localStorage.setItem('supportLastUpdate', Date.now().toString());
         }
 
         // Отримання оновлень від адміна
         function startChatPolling() {
-            // Перевіряємо оновлення кожні 2 секунди
-            chatInterval = setInterval(() => {
-                const lastUpdate = localStorage.getItem('supportLastUpdate');
-                const currentUpdate = localStorage.getItem('currentSupportUpdate');
-                
-                if (lastUpdate !== currentUpdate) {
-                    loadChatMessages();
-                    localStorage.setItem('currentSupportUpdate', lastUpdate);
+            // Перевіряємо оновлення кожні 3 секунди
+            chatInterval = setInterval(async () => {
+                if (currentConversationId) {
+                    await loadChatMessages();
                 }
-            }, 2000);
+            }, 3000);
         }
 
         // ========== ФУНКЦІОНАЛ FAQ ==========
