@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="uk">
 <head>
@@ -6,6 +7,8 @@
     <title>Управління товарами - iStore Admin</title>
     <link rel="stylesheet" href="admin-products.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Підключення Supabase -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         /* Все ваши стили остаются без изменений */
         .users-section { display: none; }
@@ -93,7 +96,7 @@
         .current-banner-info h4 { margin: 0 0 8px 0; color: #007aff; }
         .current-banner-info p { margin: 0; color: #666; font-size: 14px; }
 
-        /* Стилі для налаштувань призів */
+        /* Стилі для налаштування призів */
         .prizes-management { margin-top: 30px; padding-top: 25px; border-top: 2px solid #f0f0f0; }
         .prize-item-control { background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #e1e1e1; }
         .prize-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -222,9 +225,9 @@
                             <th>Ім'я</th>
                             <th>Email</th>
                             <th>Телефон</th>
-                            <th>Пароль</th>
                             <th>Статус</th>
                             <th>Дата реєстрації</th>
+                            <th>Останній вхід</th>
                             <th>Дії</th>
                         </tr>
                     </thead>
@@ -563,13 +566,10 @@
         </div>
     </div>
 
-    <!-- ПОДКЛЮЧЕНИЕ SUPABASE -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
-        // ==== ВАШИ КЛЮЧИ SUPABASE ====
+        // ========== ІНІЦІАЛІЗАЦІЯ SUPABASE ==========
         const supabaseUrl = 'https://mkyeotrxjswptzytnpgi.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1reWVvdHJ4anN3cHR6eXRucGdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4NDY0NzEsImV4cCI6MjA3NzQyMjQ3MX0.WGj4n2CdAVmLaX77fP-yoLgesS3P1zC9wj3YqM73QXY';
-        
         const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
         
         // Глобальні змінні
@@ -582,11 +582,6 @@
         let supportChatInterval = null;
         let currentBannerImage = null;
         let passwordVisibility = {};
-
-        // Broadcast Channel для синхронізації
-        const broadcastChannel = new BroadcastChannel('products_updates');
-        const supportChannel = new BroadcastChannel('support_messages');
-        const giveawayChannel = new BroadcastChannel('giveaway_updates');
 
         // Ініціалізація
         document.addEventListener('DOMContentLoaded', function() {
@@ -712,7 +707,759 @@
             }
         }
 
-        // Получение данных характеристик
+        // ========== УПРАВЛІННЯ КОРИСТУВАЧАМИ З SUPABASE ==========
+
+        // Завантаження користувачів з Supabase
+        async function loadUsers() {
+            const usersTableBody = document.getElementById('users-table-body');
+            
+            try {
+                showNotification('🔄 Завантаження користувачів...', 'info');
+                
+                const { data: users, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) {
+                    console.error('Помилка завантаження користувачів:', error);
+                    showNotification('❌ Помилка завантаження користувачів', 'error');
+                    return;
+                }
+
+                if (!users || users.length === 0) {
+                    usersTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="8" class="empty-users">
+                                <i class="fas fa-users"></i>
+                                <h3>Користувачів не знайдено</h3>
+                                <p>Користувачі з'являться після реєстрації на сайті</p>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                usersTableBody.innerHTML = users.map(user => {
+                    return `
+                    <tr>
+                        <td>${user.id}</td>
+                        <td>${user.full_name || user.name}</td>
+                        <td>${user.email}</td>
+                        <td>${user.phone || 'Не вказано'}</td>
+                        <td>
+                            <span class="user-status ${getUserStatusClass(user)}">
+                                ${getUserStatusText(user)}
+                            </span>
+                        </td>
+                        <td>${new Date(user.created_at).toLocaleDateString('uk-UA')}</td>
+                        <td>${user.last_login ? new Date(user.last_login).toLocaleDateString('uk-UA') : 'Ніколи'}</td>
+                        <td class="user-actions">
+                            ${user.is_blocked ? 
+                                `<button class="user-btn unblock" onclick="toggleUserBlock('${user.id}')">
+                                    <i class="fas fa-unlock"></i> Розблокувати
+                                </button>` :
+                                `<button class="user-btn block" onclick="toggleUserBlock('${user.id}')">
+                                    <i class="fas fa-ban"></i> Заблокувати
+                                </button>`
+                            }
+                            ${!user.is_admin ? 
+                                `<button class="user-btn admin" onclick="toggleAdminStatus('${user.id}')">
+                                    <i class="fas fa-crown"></i> Зробити адміном
+                                </button>` :
+                                `<button class="user-btn admin" onclick="toggleAdminStatus('${user.id}')" style="background: #6c757d;">
+                                    <i class="fas fa-user"></i> Забрати права
+                                </button>`
+                            }
+                            <button class="user-btn history" onclick="showUserHistory('${user.id}')">
+                                <i class="fas fa-history"></i> Історія
+                            </button>
+                        </td>
+                    </tr>
+                `}).join('');
+
+                showNotification(`✅ Завантажено ${users.length} користувачів`, 'success');
+                
+            } catch (error) {
+                console.error('Помилка завантаження користувачів:', error);
+                showNotification('❌ Помилка завантаження користувачів', 'error');
+            }
+        }
+
+        // Блокування/розблокування користувача
+        async function toggleUserBlock(userId) {
+            try {
+                // Спочатку отримуємо поточний статус користувача
+                const { data: user, error: fetchError } = await supabase
+                    .from('users')
+                    .select('is_blocked')
+                    .eq('id', userId)
+                    .single();
+
+                if (fetchError) throw fetchError;
+
+                const newBlockStatus = !user.is_blocked;
+
+                // Оновлюємо статус блокування
+                const { error } = await supabase
+                    .from('users')
+                    .update({ is_blocked: newBlockStatus })
+                    .eq('id', userId);
+
+                if (error) throw error;
+
+                showNotification(newBlockStatus ? 
+                    '✅ Користувача заблоковано' : '✅ Користувача розблоковано', 'success');
+                
+                // Перезавантажуємо список користувачів
+                loadUsers();
+                
+            } catch (error) {
+                console.error('Помилка зміни статусу блокування:', error);
+                showNotification('❌ Помилка зміни статусу користувача', 'error');
+            }
+        }
+
+        // Надання/забір прав адміністратора
+        async function toggleAdminStatus(userId) {
+            try {
+                // Спочатку отримуємо поточний статус користувача
+                const { data: user, error: fetchError } = await supabase
+                    .from('users')
+                    .select('is_admin')
+                    .eq('id', userId)
+                    .single();
+
+                if (fetchError) throw fetchError;
+
+                const newAdminStatus = !user.is_admin;
+
+                // Оновлюємо статус адміністратора
+                const { error } = await supabase
+                    .from('users')
+                    .update({ is_admin: newAdminStatus })
+                    .eq('id', userId);
+
+                if (error) throw error;
+
+                showNotification(newAdminStatus ? 
+                    '✅ Права адміна надано' : '✅ Права адміна забрано', 'success');
+                
+                // Перезавантажуємо список користувачів
+                loadUsers();
+                
+            } catch (error) {
+                console.error('Помилка зміни прав адміністратора:', error);
+                showNotification('❌ Помилка зміни прав користувача', 'error');
+            }
+        }
+
+        // Відображення історії замовлень користувача
+        async function showUserHistory(userId) {
+            try {
+                const { data: orders, error } = await supabase
+                    .from('user_orders')
+                    .select(`
+                        *,
+                        order_items (*)
+                    `)
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                const historyContent = document.getElementById('user-history-content');
+                
+                if (!orders || orders.length === 0) {
+                    historyContent.innerHTML = `
+                        <div style="text-align: center; padding: 40px 20px; color: #666;">
+                            <i class="fas fa-shopping-bag" style="font-size: 48px; margin-bottom: 15px; opacity: 0.5;"></i>
+                            <h3>Замовлень немає</h3>
+                            <p>Користувач ще не робив замовлень</p>
+                        </div>
+                    `;
+                } else {
+                    historyContent.innerHTML = `
+                        <div style="margin-bottom: 20px;">
+                            <h3>Користувач: ${orders[0]?.user_id || 'Невідомий'}</h3>
+                            <p>Всього замовлень: ${orders.length}</p>
+                        </div>
+                        <div style="max-height: 400px; overflow-y: auto;">
+                            ${orders.map(order => {
+                                const totalItems = order.order_items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0;
+                                return `
+                                <div style="border: 1px solid #e1e1e1; border-radius: 8px; padding: 15px; margin-bottom: 10px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                        <strong>Замовлення #${order.id}</strong>
+                                        <span style="color: #e53935; font-weight: bold;">${order.total_amount ? order.total_amount.toLocaleString('uk-UA') + ' ₴' : 'Ціна не вказана'}</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 14px;">
+                                        <div>Дата: ${new Date(order.created_at).toLocaleDateString('uk-UA')}</div>
+                                        <div>Статус: ${order.status === 'completed' ? '✅ Виконано' : '⏳ В обробці'}</div>
+                                        <div>Товарів: ${totalItems} шт.</div>
+                                        ${order.shipping_address ? `<div>Адреса: ${order.shipping_address}</div>` : ''}
+                                    </div>
+                                </div>
+                            `}).join('')}
+                        </div>
+                    `;
+                }
+
+                document.getElementById('user-history-modal').classList.add('active');
+                
+            } catch (error) {
+                console.error('Помилка завантаження історії замовлень:', error);
+                showNotification('❌ Помилка завантаження історії замовлень', 'error');
+            }
+        }
+
+        // Фільтрація користувачів
+        async function filterUsers() {
+            const searchTerm = document.getElementById('search-users').value.toLowerCase();
+            const statusFilter = document.getElementById('status-users-filter').value;
+            
+            try {
+                let query = supabase
+                    .from('users')
+                    .select('*');
+
+                // Додаємо умови фільтрації
+                if (searchTerm) {
+                    query = query.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+                }
+
+                if (statusFilter === 'active') {
+                    query = query.eq('is_blocked', false).eq('is_admin', false);
+                } else if (statusFilter === 'blocked') {
+                    query = query.eq('is_blocked', true);
+                } else if (statusFilter === 'admin') {
+                    query = query.eq('is_admin', true);
+                }
+
+                const { data: users, error } = await query.order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                const usersTableBody = document.getElementById('users-table-body');
+                
+                if (!users || users.length === 0) {
+                    usersTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 40px 20px; color: #666;">
+                                <i class="fas fa-search"></i>
+                                <p>Користувачів не знайдено</p>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                usersTableBody.innerHTML = users.map(user => {
+                    return `
+                    <tr>
+                        <td>${user.id}</td>
+                        <td>${user.full_name || user.name}</td>
+                        <td>${user.email}</td>
+                        <td>${user.phone || 'Не вказано'}</td>
+                        <td>
+                            <span class="user-status ${getUserStatusClass(user)}">
+                                ${getUserStatusText(user)}
+                            </span>
+                        </td>
+                        <td>${new Date(user.created_at).toLocaleDateString('uk-UA')}</td>
+                        <td>${user.last_login ? new Date(user.last_login).toLocaleDateString('uk-UA') : 'Ніколи'}</td>
+                        <td class="user-actions">
+                            ${user.is_blocked ? 
+                                `<button class="user-btn unblock" onclick="toggleUserBlock('${user.id}')">
+                                    <i class="fas fa-unlock"></i> Розблокувати
+                                </button>` :
+                                `<button class="user-btn block" onclick="toggleUserBlock('${user.id}')">
+                                    <i class="fas fa-ban"></i> Заблокувати
+                                </button>`
+                            }
+                            ${!user.is_admin ? 
+                                `<button class="user-btn admin" onclick="toggleAdminStatus('${user.id}')">
+                                    <i class="fas fa-crown"></i> Зробити адміном
+                                </button>` :
+                                `<button class="user-btn admin" onclick="toggleAdminStatus('${user.id}')" style="background: #6c757d;">
+                                    <i class="fas fa-user"></i> Забрати права
+                                </button>`
+                            }
+                            <button class="user-btn history" onclick="showUserHistory('${user.id}')">
+                                <i class="fas fa-history"></i> Історія
+                            </button>
+                        </td>
+                    </tr>
+                `}).join('');
+
+            } catch (error) {
+                console.error('Помилка фільтрації користувачів:', error);
+                showNotification('❌ Помилка фільтрації користувачів', 'error');
+            }
+        }
+
+        // Допоміжні функції для статусів користувачів
+        function getUserStatusClass(user) {
+            if (user.is_blocked) return 'status-blocked';
+            if (user.is_admin) return 'status-admin';
+            return 'status-active';
+        }
+
+        function getUserStatusText(user) {
+            if (user.is_blocked) return 'Заблокований';
+            if (user.is_admin) return 'Адміністратор';
+            return 'Активний';
+        }
+
+        // ========== СИСТЕМА ЧАТУ ПІДТРИМКИ З SUPABASE ==========
+
+        // Завантаження активних чатів
+        async function loadSupportChats() {
+            try {
+                const { data: conversations, error } = await supabase
+                    .from('support_conversations')
+                    .select(`
+                        *,
+                        support_messages (
+                            message_text,
+                            sender_type,
+                            created_at
+                        )
+                    `)
+                    .eq('is_active', true)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                displayChatUsers(conversations || []);
+                
+            } catch (error) {
+                console.error('Помилка завантаження чатів:', error);
+                showNotification('❌ Помилка завантаження чатів', 'error');
+            }
+        }
+
+        // Відображення списку користувачів з активними чатами
+        function displayChatUsers(conversations) {
+            const chatUsersList = document.getElementById('chat-users-list');
+            
+            if (conversations.length === 0) {
+                chatUsersList.innerHTML = `
+                    <div class="empty-users">
+                        <i class="fas fa-comments"></i>
+                        <h3>Активних чатів немає</h3>
+                        <p>Користувачі ще не зверталися до підтримки</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            chatUsersList.innerHTML = conversations.map(conversation => {
+                const lastMessage = conversation.support_messages && conversation.support_messages.length > 0 
+                    ? conversation.support_messages[conversation.support_messages.length - 1] 
+                    : null;
+                
+                const lastMessageText = lastMessage ? lastMessage.message_text : 'Розмова розпочата';
+                const lastMessageTime = lastMessage ? lastMessage.created_at : conversation.created_at;
+                const unreadCount = countUnreadMessages(conversation.support_messages);
+                
+                return `
+                    <div class="chat-user-item ${currentChatUser === conversation.id ? 'active' : ''}" 
+                         onclick="selectChatUser('${conversation.id}', '${conversation.user_name || conversation.user_id}')">
+                        <div class="chat-user-info">
+                            <div class="chat-user-name">${conversation.user_name || 'Користувач ' + conversation.user_id.substring(5)}</div>
+                            <div class="chat-user-last-message">${lastMessageText.length > 50 ? lastMessageText.substring(0, 50) + '...' : lastMessageText}</div>
+                        </div>
+                        <div class="chat-user-meta">
+                            <div class="chat-user-time">${formatMessageTime(lastMessageTime)}</div>
+                            ${unreadCount > 0 ? `<div class="unread-badge">${unreadCount}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Підрахунок непрочитаних повідомлень
+        function countUnreadMessages(messages) {
+            if (!messages) return 0;
+            return messages.filter(msg => msg.sender_type === 'user' && !msg.read).length;
+        }
+
+        // Вибір чату користувача
+        async function selectChatUser(conversationId, userName) {
+            currentChatUser = conversationId;
+            loadSupportChats(); // Оновлюємо список, щоб підсвітити активний чат
+            await loadChatMessages(conversationId);
+            await markMessagesAsRead(conversationId);
+            
+            document.getElementById('no-chat-selected').style.display = 'none';
+            document.getElementById('selected-chat-info').style.display = 'block';
+            document.getElementById('admin-chat-input-container').style.display = 'block';
+            
+            document.getElementById('selected-user-name').textContent = userName;
+            document.getElementById('selected-user-status').textContent = 'Онлайн';
+        }
+
+        // Завантаження повідомлень чату
+        async function loadChatMessages(conversationId) {
+            try {
+                const { data: messages, error } = await supabase
+                    .from('support_messages')
+                    .select('*')
+                    .eq('conversation_id', conversationId)
+                    .order('created_at', { ascending: true });
+
+                if (error) throw error;
+
+                const adminChatMessages = document.getElementById('admin-chat-messages');
+                adminChatMessages.innerHTML = '';
+                
+                messages.forEach(msg => {
+                    addAdminMessageToChat(msg.message_text, msg.sender_type, msg.created_at, false);
+                });
+                
+                adminChatMessages.scrollTop = adminChatMessages.scrollHeight;
+                
+            } catch (error) {
+                console.error('Помилка завантаження повідомлень:', error);
+            }
+        }
+
+        // Додавання повідомлення в адмін-чат
+        function addAdminMessageToChat(text, sender, timestamp, animate = true) {
+            const adminChatMessages = document.getElementById('admin-chat-messages');
+            const messageDiv = document.createElement('div');
+            
+            const messageTime = new Date(timestamp);
+            const timeString = messageTime.getHours().toString().padStart(2, '0') + ':' + 
+                             messageTime.getMinutes().toString().padStart(2, '0');
+            
+            messageDiv.className = `admin-message ${sender}`;
+            if (animate) {
+                messageDiv.style.animation = 'fadeIn 0.3s ease-out';
+            }
+            
+            messageDiv.innerHTML = `
+                <div class="admin-message-text">${text}</div>
+                <div class="admin-message-time">${timeString}</div>
+            `;
+            
+            adminChatMessages.appendChild(messageDiv);
+            adminChatMessages.scrollTop = adminChatMessages.scrollHeight;
+        }
+
+        // Відправка повідомлення від адміна
+        async function sendAdminMessage() {
+            try {
+                if (!currentChatUser) {
+                    showNotification('Оберіть користувача для відповіді', 'error');
+                    return;
+                }
+                
+                const messageInput = document.getElementById('admin-message-input');
+                const messageText = messageInput.value.trim();
+                
+                if (messageText === '') {
+                    showNotification('Будь ласка, введіть повідомлення', 'error');
+                    return;
+                }
+                
+                // Зберігаємо повідомлення в Supabase
+                const { error } = await supabase
+                    .from('support_messages')
+                    .insert([{
+                        conversation_id: currentChatUser,
+                        message_text: messageText,
+                        sender_type: 'agent',
+                        created_at: new Date().toISOString(),
+                        read: true
+                    }]);
+
+                if (error) throw error;
+
+                // Відображаємо повідомлення
+                addAdminMessageToChat(messageText, 'agent', new Date().toISOString(), true);
+                
+                // Очищаємо поле введення
+                messageInput.value = '';
+                messageInput.style.height = 'auto';
+                
+                showNotification('Повідомлення відправлено', 'success');
+                
+            } catch (error) {
+                console.error('Помилка відправки повідомлення:', error);
+                showNotification('Помилка відправки повідомлення', 'error');
+            }
+        }
+
+        // Позначення повідомлень як прочитаних
+        async function markMessagesAsRead(conversationId) {
+            try {
+                const { error } = await supabase
+                    .from('support_messages')
+                    .update({ read: true })
+                    .eq('conversation_id', conversationId)
+                    .eq('sender_type', 'user')
+                    .eq('read', false);
+
+                if (error) throw error;
+
+                // Оновлюємо список чатів
+                loadSupportChats();
+                
+            } catch (error) {
+                console.error('Помилка оновлення статусу повідомлень:', error);
+            }
+        }
+
+        // Форматування часу повідомлення
+        function formatMessageTime(timestamp) {
+            const messageTime = new Date(timestamp);
+            const now = new Date();
+            const diffMs = now - messageTime;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            if (diffMins < 1) return 'щойно';
+            if (diffMins < 60) return `${diffMins} хв`;
+            if (diffHours < 24) return `${diffHours} год`;
+            if (diffDays < 7) return `${diffDays} дн`;
+            
+            return messageTime.toLocaleDateString('uk-UA');
+        }
+
+        // Ініціалізація полів чату
+        function initializeChatFields() {
+            const adminMessageInput = document.getElementById('admin-message-input');
+            if (adminMessageInput) {
+                adminMessageInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = (this.scrollHeight) + 'px';
+                });
+
+                adminMessageInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendAdminMessage();
+                    }
+                });
+            }
+        }
+
+        // Опитування для оновлення чату
+        function startSupportPolling() {
+            supportChatInterval = setInterval(() => {
+                if (currentChatUser) {
+                    loadChatMessages(currentChatUser);
+                }
+                loadSupportChats();
+            }, 3000);
+        }
+
+        // ========== СИСТЕМА РОЗІГРАШУ З SUPABASE ==========
+
+        // Завантаження налаштувань розіграшу
+        async function loadGiveawaySettings() {
+            try {
+                const { data, error } = await supabase
+                    .from('giveaway_settings')
+                    .select('*')
+                    .single();
+
+                if (error && error.code !== 'PGRST116') {
+                    throw error;
+                }
+
+                if (data) {
+                    // Заповнюємо поля з даними з Supabase
+                    document.getElementById('giveaway-date').value = data.draw_date || '';
+                    document.getElementById('store-name').value = data.store_name || 'iMarket Sell';
+                    document.getElementById('participants-count').value = data.participants_count || 2458;
+                    document.getElementById('main-prize-name').value = data.main_prize_name || 'iPhone 15 Pro Max';
+                    document.getElementById('main-prize-condition').value = data.main_prize_condition || 'За покупку';
+                    document.getElementById('main-prize-description').value = data.main_prize_description || 'Новенький iPhone 15 Pro Max з найсучаснішими функціями';
+                    document.getElementById('secondary-prize-name').value = data.secondary_prize_name || 'AirPods Pro';
+                    document.getElementById('secondary-prize-condition').value = data.secondary_prize_condition || 'За реєстрацію';
+                    document.getElementById('secondary-prize-description').value = data.secondary_prize_description || 'Навушники AirPods Pro з функцією активного шумозаглушення';
+                    
+                    currentBannerImage = data.banner_image;
+                    if (currentBannerImage) {
+                        document.getElementById('giveaway-preview').style.backgroundImage = `url(${currentBannerImage})`;
+                        document.getElementById('giveaway-preview').style.backgroundSize = 'cover';
+                        document.getElementById('giveaway-preview').style.backgroundPosition = 'center';
+                    }
+                } else {
+                    // Встановлюємо значення за замовчуванням
+                    const defaultDate = new Date();
+                    defaultDate.setDate(defaultDate.getDate() + 30);
+                    document.getElementById('giveaway-date').value = defaultDate.toISOString().split('T')[0];
+                }
+                
+                updateGiveawayPreview();
+                updateCurrentBannerInfo();
+                
+            } catch (error) {
+                console.error('Помилка завантаження налаштувань розіграшу:', error);
+            }
+        }
+
+        // Збереження налаштувань розіграшу
+        async function saveGiveawaySettings() {
+            try {
+                const dateInput = document.getElementById('giveaway-date').value;
+                
+                if (!dateInput) {
+                    showNotification('❌ Будь ласка, встановіть дату розіграшу', 'error');
+                    return;
+                }
+                
+                const giveawayData = {
+                    draw_date: dateInput,
+                    store_name: document.getElementById('store-name').value,
+                    participants_count: parseInt(document.getElementById('participants-count').value),
+                    main_prize_name: document.getElementById('main-prize-name').value,
+                    main_prize_condition: document.getElementById('main-prize-condition').value,
+                    main_prize_description: document.getElementById('main-prize-description').value,
+                    secondary_prize_name: document.getElementById('secondary-prize-name').value,
+                    secondary_prize_condition: document.getElementById('secondary-prize-condition').value,
+                    secondary_prize_description: document.getElementById('secondary-prize-description').value,
+                    banner_image: currentBannerImage,
+                    updated_at: new Date().toISOString()
+                };
+
+                // Перевіряємо, чи існують вже налаштування
+                const { data: existingSettings } = await supabase
+                    .from('giveaway_settings')
+                    .select('id')
+                    .single();
+
+                let result;
+                if (existingSettings) {
+                    // Оновлюємо існуючі налаштування
+                    result = await supabase
+                        .from('giveaway_settings')
+                        .update(giveawayData)
+                        .eq('id', existingSettings.id);
+                } else {
+                    // Створюємо нові налаштування
+                    result = await supabase
+                        .from('giveaway_settings')
+                        .insert([giveawayData]);
+                }
+
+                if (result.error) throw result.error;
+
+                showNotification('✅ Налаштування розіграшу збережено!', 'success');
+                updateCurrentBannerInfo();
+                
+            } catch (error) {
+                console.error('Помилка збереження налаштувань розіграшу:', error);
+                showNotification('❌ Помилка збереження налаштувань', 'error');
+            }
+        }
+
+        // Оновлення прев'ю розіграшу
+        function updateGiveawayPreview() {
+            const dateInput = document.getElementById('giveaway-date');
+            const previewDate = document.getElementById('preview-date');
+            
+            if (dateInput.value) {
+                const date = new Date(dateInput.value);
+                const formattedDate = date.toLocaleDateString('uk-UA');
+                previewDate.textContent = formattedDate;
+            }
+            
+            const storeName = document.getElementById('store-name').value;
+            document.getElementById('preview-store-logo').innerHTML = `i<span>${storeName}</span>`;
+            
+            const mainPrizeName = document.getElementById('main-prize-name').value;
+            const mainPrizeCondition = document.getElementById('main-prize-condition').value;
+            const secondaryPrizeName = document.getElementById('secondary-prize-name').value;
+            const secondaryPrizeCondition = document.getElementById('secondary-prize-condition').value;
+            
+            document.getElementById('preview-main-prize-name').textContent = mainPrizeName;
+            document.getElementById('preview-main-prize-condition').textContent = mainPrizeCondition;
+            document.getElementById('preview-secondary-prize-name').textContent = secondaryPrizeName;
+            document.getElementById('preview-secondary-prize-condition').textContent = secondaryPrizeCondition;
+            
+            const participants = document.getElementById('participants-count').value;
+            document.getElementById('preview-participants').textContent = parseInt(participants).toLocaleString('uk-UA');
+            
+            updateCurrentBannerInfo();
+        }
+
+        // Обробка завантаження банера
+        function handleBannerUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentBannerImage = e.target.result;
+                document.getElementById('giveaway-preview').style.backgroundImage = `url(${e.target.result})`;
+                document.getElementById('giveaway-preview').style.backgroundSize = 'cover';
+                document.getElementById('giveaway-preview').style.backgroundPosition = 'center';
+                updateCurrentBannerInfo();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Оновлення інформації про поточний банер
+        function updateCurrentBannerInfo() {
+            const dateInput = document.getElementById('giveaway-date');
+            const participants = document.getElementById('participants-count').value;
+            
+            const date = dateInput.value ? new Date(dateInput.value).toLocaleDateString('uk-UA') : 'Не встановлено';
+            const bannerInfo = currentBannerImage ? 'Завантажене фото' : 'Стандартний градієнт';
+            
+            document.getElementById('current-banner-info').textContent = `Фон: ${bannerInfo} | Дата: ${date} | Учасників: ${parseInt(participants).toLocaleString('uk-UA')}`;
+        }
+
+        // Скидання налаштувань розіграшу
+        function resetGiveawaySettings() {
+            if (confirm('Ви впевнені, що хочете скинути всі налаштування розіграшу?')) {
+                document.getElementById('giveaway-date').value = '';
+                document.getElementById('store-name').value = 'iMarket Sell';
+                document.getElementById('participants-count').value = '2458';
+                document.getElementById('main-prize-name').value = 'iPhone 15 Pro Max';
+                document.getElementById('main-prize-condition').value = 'За покупку';
+                document.getElementById('main-prize-description').value = 'Новенький iPhone 15 Pro Max з найсучаснішими функціями';
+                document.getElementById('secondary-prize-name').value = 'AirPods Pro';
+                document.getElementById('secondary-prize-condition').value = 'За реєстрацію';
+                document.getElementById('secondary-prize-description').value = 'Навушники AirPods Pro з функцією активного шумозаглушення';
+                
+                currentBannerImage = null;
+                const preview = document.getElementById('giveaway-preview');
+                preview.style.backgroundImage = '';
+                preview.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #8e44ad 100%)';
+                
+                updateGiveawayPreview();
+                
+                showNotification('⚙️ Налаштування скинуто до значень за замовчуванням', 'info');
+            }
+        }
+
+        // Тест синхронізації розіграшу
+        async function testGiveawaySync() {
+            try {
+                const { data, error } = await supabase
+                    .from('giveaway_settings')
+                    .select('*')
+                    .single();
+
+                if (error) throw error;
+
+                console.log('Тест синхронізації:', data);
+                showNotification('🔍 Дані успішно синхронізовані! Перевірте консоль для деталей.', 'success');
+            } catch (error) {
+                console.error('Помилка тесту синхронізації:', error);
+                showNotification('❌ Немає даних для синхронізації', 'error');
+            }
+        }
+
+        // ========== РЕШТА ФУНКЦІЙ БЕЗ ЗМІН ==========
+
         function getCharacteristicsData() {
             const characteristics = {};
             const characteristicRows = document.querySelectorAll('.characteristic-row');
@@ -728,8 +1475,6 @@
             
             return Object.keys(characteristics).length > 0 ? characteristics : null;
         }
-
-        // ========== ОСТАЛЬНЫЕ ФУНКЦИИ (без изменений) ==========
 
         function displayProducts(products) {
             const productsGrid = document.getElementById('products-grid');
@@ -991,6 +1736,10 @@
             document.getElementById('delete-modal').classList.remove('active');
         }
 
+        function closeUserHistoryModal() {
+            document.getElementById('user-history-modal').classList.remove('active');
+        }
+
         function exportProducts() {
             if (products.length === 0) {
                 showNotification('❌ Немає товарів для експорту!', 'error');
@@ -1012,12 +1761,6 @@
             localStorage.setItem('storeProducts', JSON.stringify(products));
             localStorage.setItem('productsLastUpdate', Date.now().toString());
             
-            broadcastChannel.postMessage({
-                type: 'products_updated',
-                timestamp: Date.now(),
-                count: products.length
-            });
-            
             showNotification('✅ Синхронізація виконана!', 'success');
         }
 
@@ -1031,30 +1774,7 @@
         }
 
         function setupBroadcastListener() {
-            broadcastChannel.onmessage = (event) => {
-                if (event.data.type === 'products_updated') {
-                    console.log('Отримано оновлення товарів');
-                    loadProducts();
-                    updateProductsCount();
-                }
-            };
-            
-            supportChannel.onmessage = (event) => {
-                if (event.data.type === 'messages_updated') {
-                    console.log('Отримано оновлення повідомлень підтримки');
-                    loadSupportChats();
-                    if (currentChatUser) {
-                        loadChatMessages(currentChatUser);
-                    }
-                }
-            };
-
-            giveawayChannel.onmessage = (event) => {
-                if (event.data.type === 'giveaway_updated') {
-                    console.log('Отримано оновлення розіграшу');
-                    loadGiveawaySettings();
-                }
-            };
+            // Можна додати Broadcast Channel при необхідності
         }
 
         function switchAdminTab(tab) {
@@ -1071,664 +1791,6 @@
             if (tab === 'giveaway') {
                 updateGiveawayPreview();
             }
-        }
-
-        // ========== ФУНКЦІЇ ДЛЯ РОЗІГРАШУ ==========
-
-        function loadGiveawaySettings() {
-            const giveawaySettings = JSON.parse(localStorage.getItem('giveawaySettings')) || {};
-            
-            if (giveawaySettings.date) {
-                document.getElementById('giveaway-date').value = giveawaySettings.date;
-            } else {
-                const defaultDate = new Date();
-                defaultDate.setDate(defaultDate.getDate() + 30);
-                document.getElementById('giveaway-date').value = defaultDate.toISOString().split('T')[0];
-            }
-            
-            if (giveawaySettings.storeName) {
-                document.getElementById('store-name').value = giveawaySettings.storeName;
-            }
-            if (giveawaySettings.participants) {
-                document.getElementById('participants-count').value = giveawaySettings.participants;
-            }
-            if (giveawaySettings.mainPrize) {
-                document.getElementById('main-prize-name').value = giveawaySettings.mainPrize.name;
-                document.getElementById('main-prize-condition').value = giveawaySettings.mainPrize.condition;
-                document.getElementById('main-prize-description').value = giveawaySettings.mainPrize.description;
-            }
-            if (giveawaySettings.secondaryPrize) {
-                document.getElementById('secondary-prize-name').value = giveawaySettings.secondaryPrize.name;
-                document.getElementById('secondary-prize-condition').value = giveawaySettings.secondaryPrize.condition;
-                document.getElementById('secondary-prize-description').value = giveawaySettings.secondaryPrize.description;
-            }
-            
-            if (giveawaySettings.background) {
-                currentBannerImage = giveawaySettings.background;
-                document.getElementById('giveaway-preview').style.backgroundImage = `url(${giveawaySettings.background})`;
-                document.getElementById('giveaway-preview').style.backgroundSize = 'cover';
-                document.getElementById('giveaway-preview').style.backgroundPosition = 'center';
-            }
-            
-            updateGiveawayPreview();
-            updateCurrentBannerInfo();
-        }
-
-        function updateGiveawayPreview() {
-            const dateInput = document.getElementById('giveaway-date');
-            const previewDate = document.getElementById('preview-date');
-            
-            if (dateInput.value) {
-                const date = new Date(dateInput.value);
-                const formattedDate = date.toLocaleDateString('uk-UA');
-                previewDate.textContent = formattedDate;
-            }
-            
-            const storeName = document.getElementById('store-name').value;
-            document.getElementById('preview-store-logo').innerHTML = `i<span>${storeName}</span>`;
-            
-            const mainPrizeName = document.getElementById('main-prize-name').value;
-            const mainPrizeCondition = document.getElementById('main-prize-condition').value;
-            const secondaryPrizeName = document.getElementById('secondary-prize-name').value;
-            const secondaryPrizeCondition = document.getElementById('secondary-prize-condition').value;
-            
-            document.getElementById('preview-main-prize-name').textContent = mainPrizeName;
-            document.getElementById('preview-main-prize-condition').textContent = mainPrizeCondition;
-            document.getElementById('preview-secondary-prize-name').textContent = secondaryPrizeName;
-            document.getElementById('preview-secondary-prize-condition').textContent = secondaryPrizeCondition;
-            
-            const participants = document.getElementById('participants-count').value;
-            document.getElementById('preview-participants').textContent = parseInt(participants).toLocaleString('uk-UA');
-            
-            updateCurrentBannerInfo();
-        }
-
-        function handleBannerUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                currentBannerImage = e.target.result;
-                document.getElementById('giveaway-preview').style.backgroundImage = `url(${e.target.result})`;
-                document.getElementById('giveaway-preview').style.backgroundSize = 'cover';
-                document.getElementById('giveaway-preview').style.backgroundPosition = 'center';
-                updateCurrentBannerInfo();
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function updateCurrentBannerInfo() {
-            const dateInput = document.getElementById('giveaway-date');
-            const participants = document.getElementById('participants-count').value;
-            
-            const date = dateInput.value ? new Date(dateInput.value).toLocaleDateString('uk-UA') : 'Не встановлено';
-            const bannerInfo = currentBannerImage ? 'Завантажене фото' : 'Стандартний градієнт';
-            
-            document.getElementById('current-banner-info').textContent = `Фон: ${bannerInfo} | Дата: ${date} | Учасників: ${parseInt(participants).toLocaleString('uk-UA')}`;
-        }
-
-        function saveGiveawaySettings() {
-            const dateInput = document.getElementById('giveaway-date').value;
-            
-            if (!dateInput) {
-                showNotification('❌ Будь ласка, встановіть дату розіграшу', 'error');
-                return;
-            }
-            
-            const giveawaySettings = {
-                date: dateInput,
-                storeName: document.getElementById('store-name').value,
-                participants: document.getElementById('participants-count').value,
-                mainPrize: {
-                    name: document.getElementById('main-prize-name').value,
-                    condition: document.getElementById('main-prize-condition').value,
-                    description: document.getElementById('main-prize-description').value
-                },
-                secondaryPrize: {
-                    name: document.getElementById('secondary-prize-name').value,
-                    condition: document.getElementById('secondary-prize-condition').value,
-                    description: document.getElementById('secondary-prize-description').value
-                },
-                background: currentBannerImage,
-                lastUpdated: Date.now()
-            };
-            
-            localStorage.setItem('giveawaySettings', JSON.stringify(giveawaySettings));
-            
-            broadcastGiveawayUpdate();
-            
-            showNotification('✅ Налаштування розіграшу збережено!', 'success');
-        }
-
-        function broadcastGiveawayUpdate() {
-            localStorage.setItem('giveawayLastUpdate', Date.now().toString());
-            
-            if (typeof BroadcastChannel !== 'undefined') {
-                giveawayChannel.postMessage({
-                    type: 'giveaway_updated',
-                    timestamp: Date.now(),
-                    data: JSON.parse(localStorage.getItem('giveawaySettings'))
-                });
-            }
-            
-            localStorage.setItem('mainPageGiveawayData', localStorage.getItem('giveawaySettings'));
-        }
-
-        function resetGiveawaySettings() {
-            if (confirm('Ви впевнені, що хочете скинути всі налаштування розіграшу?')) {
-                document.getElementById('giveaway-date').value = '';
-                document.getElementById('store-name').value = 'iMarket Sell';
-                document.getElementById('participants-count').value = '2458';
-                document.getElementById('main-prize-name').value = 'iPhone 15 Pro Max';
-                document.getElementById('main-prize-condition').value = 'За покупку';
-                document.getElementById('main-prize-description').value = 'Новенький iPhone 15 Pro Max з найсучаснішими функціями';
-                document.getElementById('secondary-prize-name').value = 'AirPods Pro';
-                document.getElementById('secondary-prize-condition').value = 'За реєстрацію';
-                document.getElementById('secondary-prize-description').value = 'Навушники AirPods Pro з функцією активного шумозаглушення';
-                
-                currentBannerImage = null;
-                const preview = document.getElementById('giveaway-preview');
-                preview.style.backgroundImage = '';
-                preview.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #8e44ad 100%)';
-                
-                updateGiveawayPreview();
-                
-                showNotification('⚙️ Налаштування скинуто до значень за замовчуванням', 'info');
-            }
-        }
-
-        function testGiveawaySync() {
-            const giveawayData = localStorage.getItem('giveawaySettings');
-            if (giveawayData) {
-                const settings = JSON.parse(giveawayData);
-                console.log('Тест синхронізації:', settings);
-                showNotification('🔍 Дані успішно синхронізовані! Перевірте консоль для деталей.', 'success');
-            } else {
-                showNotification('❌ Немає даних для синхронізації', 'error');
-            }
-        }
-
-        // ========== СИСТЕМА ЧАТУ ПІДТРИМКИ ==========
-
-        function initializeChatFields() {
-            const adminMessageInput = document.getElementById('admin-message-input');
-            if (adminMessageInput) {
-                adminMessageInput.addEventListener('input', function() {
-                    this.style.height = 'auto';
-                    this.style.height = (this.scrollHeight) + 'px';
-                });
-
-                adminMessageInput.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendAdminMessage();
-                    }
-                });
-            }
-        }
-
-        function loadSupportChats() {
-            const chatUsersList = document.getElementById('chat-users-list');
-            const allMessages = getAllSupportMessages();
-            
-            const uniqueUsers = {};
-            allMessages.forEach(msg => {
-                if (!uniqueUsers[msg.userId]) {
-                    uniqueUsers[msg.userId] = {
-                        userId: msg.userId,
-                        lastMessage: msg.text,
-                        lastMessageTime: msg.timestamp,
-                        unread: countUnreadMessages(msg.userId)
-                    };
-                } else {
-                    if (new Date(msg.timestamp) > new Date(uniqueUsers[msg.userId].lastMessageTime)) {
-                        uniqueUsers[msg.userId].lastMessage = msg.text;
-                        uniqueUsers[msg.userId].lastMessageTime = msg.timestamp;
-                    }
-                }
-            });
-            
-            const usersArray = Object.values(uniqueUsers);
-            
-            if (usersArray.length === 0) {
-                chatUsersList.innerHTML = `
-                    <div class="empty-users">
-                        <i class="fas fa-comments"></i>
-                        <h3>Чатів немає</h3>
-                        <p>Користувачі ще не зверталися до підтримки</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            usersArray.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
-            
-            chatUsersList.innerHTML = usersArray.map(user => `
-                <div class="chat-user-item ${currentChatUser === user.userId ? 'active' : ''}" onclick="selectChatUser('${user.userId}')">
-                    <div class="chat-user-info">
-                        <div class="chat-user-name">Користувач ${user.userId.substring(5)}</div>
-                        <div class="chat-user-last-message">${user.lastMessage.length > 50 ? user.lastMessage.substring(0, 50) + '...' : user.lastMessage}</div>
-                    </div>
-                    <div class="chat-user-meta">
-                        <div class="chat-user-time">${formatMessageTime(user.lastMessageTime)}</div>
-                        ${user.unread > 0 ? `<div class="unread-badge">${user.unread}</div>` : ''}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function getAllSupportMessages() {
-            return JSON.parse(localStorage.getItem('supportMessages')) || [];
-        }
-
-        function getUserSupportMessages(userId) {
-            const allMessages = getAllSupportMessages();
-            return allMessages.filter(msg => msg.userId === userId);
-        }
-
-        function countUnreadMessages(userId) {
-            const userMessages = getUserSupportMessages(userId);
-            return userMessages.filter(msg => msg.type === 'user' && !msg.read).length;
-        }
-
-        function selectChatUser(userId) {
-            currentChatUser = userId;
-            loadSupportChats();
-            loadChatMessages(userId);
-            markMessagesAsRead(userId);
-        }
-
-        function loadChatMessages(userId) {
-            const adminChatMessages = document.getElementById('admin-chat-messages');
-            const userMessages = getUserSupportMessages(userId);
-            
-            adminChatMessages.innerHTML = '';
-            
-            userMessages.forEach(msg => {
-                addAdminMessageToChat(msg.text, msg.type, msg.timestamp, false);
-            });
-            
-            adminChatMessages.scrollTop = adminChatMessages.scrollHeight;
-            
-            document.getElementById('no-chat-selected').style.display = 'none';
-            document.getElementById('selected-chat-info').style.display = 'block';
-            document.getElementById('admin-chat-input-container').style.display = 'block';
-            
-            document.getElementById('selected-user-name').textContent = `Користувач ${userId.substring(5)}`;
-        }
-
-        function addAdminMessageToChat(text, sender, timestamp, animate = true) {
-            const adminChatMessages = document.getElementById('admin-chat-messages');
-            const messageDiv = document.createElement('div');
-            
-            const messageTime = new Date(timestamp);
-            const timeString = messageTime.getHours().toString().padStart(2, '0') + ':' + 
-                             messageTime.getMinutes().toString().padStart(2, '0');
-            
-            messageDiv.className = `admin-message ${sender}`;
-            if (animate) {
-                messageDiv.style.animation = 'fadeIn 0.3s ease-out';
-            }
-            
-            messageDiv.innerHTML = `
-                <div class="admin-message-text">${text}</div>
-                <div class="admin-message-time">${timeString}</div>
-            `;
-            
-            adminChatMessages.appendChild(messageDiv);
-            adminChatMessages.scrollTop = adminChatMessages.scrollHeight;
-        }
-
-        function sendAdminMessage() {
-            if (!currentChatUser) {
-                showNotification('Оберіть користувача для відповіді', 'error');
-                return;
-            }
-            
-            const messageInput = document.getElementById('admin-message-input');
-            const messageText = messageInput.value.trim();
-            
-            if (messageText === '') {
-                showNotification('Будь ласка, введіть повідомлення', 'error');
-                return;
-            }
-            
-            const message = {
-                id: 'msg_' + Date.now(),
-                userId: currentChatUser,
-                text: messageText,
-                type: 'agent',
-                timestamp: new Date().toISOString(),
-                read: true
-            };
-            
-            saveSupportMessage(message);
-            addAdminMessageToChat(messageText, 'agent', message.timestamp, true);
-            
-            messageInput.value = '';
-            messageInput.style.height = 'auto';
-            
-            broadcastSupportUpdate();
-            
-            showNotification('Повідомлення відправлено', 'success');
-        }
-
-        function saveSupportMessage(message) {
-            const allMessages = getAllSupportMessages();
-            allMessages.push(message);
-            localStorage.setItem('supportMessages', JSON.stringify(allMessages));
-        }
-
-        function markMessagesAsRead(userId) {
-            const allMessages = getAllSupportMessages();
-            let updated = false;
-            
-            allMessages.forEach(msg => {
-                if (msg.userId === userId && msg.type === 'user' && !msg.read) {
-                    msg.read = true;
-                    updated = true;
-                }
-            });
-            
-            if (updated) {
-                localStorage.setItem('supportMessages', JSON.stringify(allMessages));
-                loadSupportChats();
-            }
-        }
-
-        function formatMessageTime(timestamp) {
-            const messageTime = new Date(timestamp);
-            const now = new Date();
-            const diffMs = now - messageTime;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMs / 3600000);
-            const diffDays = Math.floor(diffMs / 86400000);
-            
-            if (diffMins < 1) return 'щойно';
-            if (diffMins < 60) return `${diffMins} хв`;
-            if (diffHours < 24) return `${diffHours} год`;
-            if (diffDays < 7) return `${diffDays} дн`;
-            
-            return messageTime.toLocaleDateString('uk-UA');
-        }
-
-        function broadcastSupportUpdate() {
-            localStorage.setItem('supportLastUpdate', Date.now().toString());
-            
-            if (typeof BroadcastChannel !== 'undefined') {
-                const channel = new BroadcastChannel('support_messages');
-                channel.postMessage({
-                    type: 'messages_updated',
-                    timestamp: Date.now()
-                });
-            }
-        }
-
-        function startSupportPolling() {
-            supportChatInterval = setInterval(() => {
-                const lastUpdate = localStorage.getItem('supportLastUpdate');
-                const currentUpdate = localStorage.getItem('currentAdminSupportUpdate');
-                
-                if (lastUpdate !== currentUpdate) {
-                    loadSupportChats();
-                    if (currentChatUser) {
-                        loadChatMessages(currentChatUser);
-                    }
-                    localStorage.setItem('currentAdminSupportUpdate', lastUpdate);
-                }
-            }, 2000);
-        }
-
-        // ========== УПРАВЛІННЯ КОРИСТУВАЧАМИ ==========
-
-        function loadUsers() {
-            const usersTableBody = document.getElementById('users-table-body');
-            const usersDatabase = JSON.parse(localStorage.getItem('storeUsers')) || [];
-            
-            if (usersDatabase.length === 0) {
-                usersTableBody.innerHTML = `
-                    <tr>
-                        <td colspan="8" class="empty-users">
-                            <i class="fas fa-users"></i>
-                            <h3>Користувачів не знайдено</h3>
-                            <p>Користувачі з'являться після реєстрації на сайті</p>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            usersTableBody.innerHTML = usersDatabase.map(user => {
-                const isPasswordVisible = passwordVisibility[user.id] || false;
-                const passwordDisplay = isPasswordVisible ? user.password : '••••••••';
-                
-                return `
-                <tr>
-                    <td>${user.id}</td>
-                    <td>${user.name}</td>
-                    <td>${user.email}</td>
-                    <td>${user.phone || 'Не вказано'}</td>
-                    <td>${passwordDisplay}</td>
-                    <td>
-                        <span class="user-status ${getUserStatusClass(user)}">
-                            ${getUserStatusText(user)}
-                        </span>
-                    </td>
-                    <td>${new Date(user.createdAt).toLocaleDateString('uk-UA')}</td>
-                    <td class="user-actions">
-                        ${user.isBlocked ? 
-                            `<button class="user-btn unblock" onclick="toggleUserBlock(${user.id})">
-                                <i class="fas fa-unlock"></i> Розблокувати
-                            </button>` :
-                            `<button class="user-btn block" onclick="toggleUserBlock(${user.id})">
-                                <i class="fas fa-ban"></i> Заблокувати
-                            </button>`
-                        }
-                        ${!user.isAdmin ? 
-                            `<button class="user-btn admin" onclick="toggleAdminStatus(${user.id})">
-                                <i class="fas fa-crown"></i> Зробити адміном
-                            </button>` :
-                            `<button class="user-btn admin" onclick="toggleAdminStatus(${user.id})" style="background: #6c757d;">
-                                <i class="fas fa-user"></i> Забрати права
-                            </button>`
-                        }
-                        <button class="user-btn password" onclick="togglePasswordVisibility(${user.id})">
-                            <i class="fas ${isPasswordVisible ? 'fa-eye-slash' : 'fa-eye'}"></i> 
-                            ${isPasswordVisible ? 'Приховати' : 'Показати пароль'}
-                        </button>
-                        <button class="user-btn history" onclick="showUserHistory(${user.id})">
-                            <i class="fas fa-history"></i> Історія
-                        </button>
-                    </td>
-                </tr>
-            `}).join('');
-        }
-
-        function togglePasswordVisibility(userId) {
-            passwordVisibility[userId] = !passwordVisibility[userId];
-            loadUsers();
-        }
-
-        function getUserStatusClass(user) {
-            if (user.isBlocked) return 'status-blocked';
-            if (user.isAdmin) return 'status-admin';
-            return 'status-active';
-        }
-
-        function getUserStatusText(user) {
-            if (user.isBlocked) return 'Заблокований';
-            if (user.isAdmin) return 'Адміністратор';
-            return 'Активний';
-        }
-
-        function toggleUserBlock(userId) {
-            const usersDatabase = JSON.parse(localStorage.getItem('storeUsers')) || [];
-            const userIndex = usersDatabase.findIndex(u => u.id === userId);
-            
-            if (userIndex !== -1) {
-                usersDatabase[userIndex].isBlocked = !usersDatabase[userIndex].isBlocked;
-                localStorage.setItem('storeUsers', JSON.stringify(usersDatabase));
-                
-                const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-                if (currentUser && currentUser.id === userId) {
-                    currentUser.isBlocked = usersDatabase[userIndex].isBlocked;
-                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                }
-                
-                loadUsers();
-                showNotification(usersDatabase[userIndex].isBlocked ? 
-                    '✅ Користувача заблоковано' : '✅ Користувача розблоковано', 'success');
-            }
-        }
-
-        function toggleAdminStatus(userId) {
-            const usersDatabase = JSON.parse(localStorage.getItem('storeUsers')) || [];
-            const userIndex = usersDatabase.findIndex(u => u.id === userId);
-            
-            if (userIndex !== -1) {
-                usersDatabase[userIndex].isAdmin = !usersDatabase[userIndex].isAdmin;
-                localStorage.setItem('storeUsers', JSON.stringify(usersDatabase));
-                
-                const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-                if (currentUser && currentUser.id === userId) {
-                    currentUser.isAdmin = usersDatabase[userIndex].isAdmin;
-                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                }
-                
-                loadUsers();
-                showNotification(usersDatabase[userIndex].isAdmin ? 
-                    '✅ Права адміна надано' : '✅ Права адміна забрано', 'success');
-            }
-        }
-
-        function showUserHistory(userId) {
-            const usersDatabase = JSON.parse(localStorage.getItem('storeUsers')) || [];
-            const user = usersDatabase.find(u => u.id === userId);
-            
-            if (!user) return;
-
-            const historyContent = document.getElementById('user-history-content');
-            const orders = user.orders || [];
-
-            if (orders.length === 0) {
-                historyContent.innerHTML = `
-                    <div style="text-align: center; padding: 40px 20px; color: #666;">
-                        <i class="fas fa-shopping-bag" style="font-size: 48px; margin-bottom: 15px; opacity: 0.5;"></i>
-                        <h3>Замовлень немає</h3>
-                        <p>Користувач ще не робив замовлень</p>
-                    </div>
-                `;
-            } else {
-                historyContent.innerHTML = `
-                    <div style="margin-bottom: 20px;">
-                        <h3>Користувач: ${user.name}</h3>
-                        <p>Email: ${user.email}</p>
-                        <p>Всього замовлень: ${orders.length}</p>
-                    </div>
-                    <div style="max-height: 400px; overflow-y: auto;">
-                        ${orders.map(order => `
-                            <div style="border: 1px solid #e1e1e1; border-radius: 8px; padding: 15px; margin-bottom: 10px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                    <strong>Замовлення #${order.id}</strong>
-                                    <span style="color: #e53935; font-weight: bold;">${order.total ? order.total.toLocaleString('uk-UA') + ' ₴' : 'Ціна не вказана'}</span>
-                                </div>
-                                <div style="color: #666; font-size: 14px;">
-                                    <div>Дата: ${new Date(order.date).toLocaleDateString('uk-UA')}</div>
-                                    <div>Статус: ${order.status === 'completed' ? '✅ Виконано' : '⏳ В обробці'}</div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
-
-            document.getElementById('user-history-modal').classList.add('active');
-        }
-
-        function closeUserHistoryModal() {
-            document.getElementById('user-history-modal').classList.remove('active');
-        }
-
-        function filterUsers() {
-            const searchTerm = document.getElementById('search-users').value.toLowerCase();
-            const statusFilter = document.getElementById('status-users-filter').value;
-            
-            const usersTableBody = document.getElementById('users-table-body');
-            const usersDatabase = JSON.parse(localStorage.getItem('storeUsers')) || [];
-            
-            const filteredUsers = usersDatabase.filter(user => {
-                const matchesSearch = user.name.toLowerCase().includes(searchTerm) || 
-                                    user.email.toLowerCase().includes(searchTerm);
-                
-                let matchesStatus = true;
-                if (statusFilter === 'active') {
-                    matchesStatus = !user.isBlocked && !user.isAdmin;
-                } else if (statusFilter === 'blocked') {
-                    matchesStatus = user.isBlocked;
-                } else if (statusFilter === 'admin') {
-                    matchesStatus = user.isAdmin;
-                }
-                
-                return matchesSearch && matchesStatus;
-            });
-
-            if (filteredUsers.length === 0) {
-                usersTableBody.innerHTML = `
-                    <tr>
-                        <td colspan="8" style="text-align: center; padding: 40px 20px; color: #666;">
-                            <i class="fas fa-search"></i>
-                            <p>Користувачів не знайдено</p>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            usersTableBody.innerHTML = filteredUsers.map(user => {
-                const isPasswordVisible = passwordVisibility[user.id] || false;
-                const passwordDisplay = isPasswordVisible ? user.password : '••••••••';
-                
-                return `
-                <tr>
-                    <td>${user.id}</td>
-                    <td>${user.name}</td>
-                    <td>${user.email}</td>
-                    <td>${user.phone || 'Не вказано'}</td>
-                    <td>${passwordDisplay}</td>
-                    <td>
-                        <span class="user-status ${getUserStatusClass(user)}">
-                            ${getUserStatusText(user)}
-                        </span>
-                    </td>
-                    <td>${new Date(user.createdAt).toLocaleDateString('uk-UA')}</td>
-                    <td class="user-actions">
-                        ${user.isBlocked ? 
-                            `<button class="user-btn unblock" onclick="toggleUserBlock(${user.id})">
-                                <i class="fas fa-unlock"></i> Розблокувати
-                            </button>` :
-                            `<button class="user-btn block" onclick="toggleUserBlock(${user.id})">
-                                <i class="fas fa-ban"></i> Заблокувати
-                            </button>`
-                        }
-                        ${!user.isAdmin ? 
-                            `<button class="user-btn admin" onclick="toggleAdminStatus(${user.id})">
-                                <i class="fas fa-crown"></i> Зробити адміном
-                            </button>` :
-                            `<button class="user-btn admin" onclick="toggleAdminStatus(${user.id})" style="background: #6c757d;">
-                                <i class="fas fa-user"></i> Забрати права
-                            </button>`
-                        }
-                        <button class="user-btn password" onclick="togglePasswordVisibility(${user.id})">
-                            <i class="fas ${isPasswordVisible ? 'fa-eye-slash' : 'fa-eye'}"></i> 
-                            ${isPasswordVisible ? 'Приховати' : 'Показати пароль'}
-                        </button>
-                        <button class="user-btn history" onclick="showUserHistory(${user.id})">
-                            <i class="fas fa-history"></i> Історія
-                        </button>
-                    </td>
-                </tr>
-            `}).join('');
         }
 
         function showNotification(message, type = 'info') {
