@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="uk">
 <head>
@@ -1517,6 +1518,9 @@
             // Обробники подій
             document.getElementById('logout-btn').addEventListener('click', logout);
             document.getElementById('edit-profile-btn').addEventListener('click', openEditProfileModal);
+            document.getElementById('admin-panel-btn').addEventListener('click', function() {
+                window.location.href = 'admin-products.html';
+            });
 
             // Обробка ESC
             document.addEventListener('keydown', function(e) {
