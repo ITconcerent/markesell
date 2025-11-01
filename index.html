@@ -2740,6 +2740,51 @@
             return session;
         }
 
+        // Функція перевірки адміністратора
+        async function checkAdminStatus() {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                if (!user) return false;
+
+                console.log('🔍 Checking admin status for user:', user.id);
+
+                // Перевіряємо таблицю users
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('is_admin')
+                    .eq('auth_id', user.id)
+                    .single();
+
+                if (error) {
+                    console.log('❌ Помилка перевірки адмін-статусу:', error);
+                    return false;
+                }
+
+                console.log('✅ Admin status result:', data);
+                return data?.is_admin === true;
+            } catch (error) {
+                console.error('❌ Помилка перевірки адмін-статусу:', error);
+                return false;
+            }
+        }
+
+        // Функція оновлення адмін-елементів
+        function updateAdminElements(isAdmin) {
+            const adminBadge = document.getElementById('admin-badge');
+            const adminPanelBtn = document.getElementById('admin-panel-btn');
+            
+            if (adminBadge) {
+                adminBadge.style.display = isAdmin ? 'inline-block' : 'none';
+            }
+            
+            if (adminPanelBtn) {
+                adminPanelBtn.style.display = isAdmin ? 'flex' : 'none';
+            }
+            
+            console.log('👑 Admin elements updated:', isAdmin);
+        }
+
         // Оновлена функція для кнопки "Увійти"
         async function handleLogin(event) {
             if (event) event.preventDefault();
@@ -2861,7 +2906,6 @@
             const session = await checkAuth();
             
             if (session) {
-                // Отримуємо дані користувача
                 const { data: { user } } = await supabase.auth.getUser();
                 const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Користувач';
                 
@@ -2870,6 +2914,10 @@
                     e.preventDefault();
                     window.location.href = 'profile.html';
                 };
+
+                // Перевіряємо адмін-статус для профілю
+                const isAdmin = await checkAdminStatus();
+                updateAdminElements(isAdmin);
             } else {
                 loginBtn.innerHTML = `<i class="fas fa-user"></i> Увійти`;
                 loginBtn.onclick = (e) => {
